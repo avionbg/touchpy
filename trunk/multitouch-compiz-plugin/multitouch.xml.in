@@ -1,0 +1,14 @@
+<compiz>
+  <plugin name="multitouch" useBcop="true">
+    <_short>Multitouch input</_short>
+    <_long>Use multitouch screens trough tuio protocol to drive various plugins</_long>
+    <category>Desktop</category>
+    <display>
+          <option name="toggle_key" type="key">
+                <_short>Toggle display</_short>
+                <_long>Toggle display.</_long>
+                <default>&lt;Super&gt;V</default>
+           </option>
+    </display>
+  </plugin>
+</compiz>
