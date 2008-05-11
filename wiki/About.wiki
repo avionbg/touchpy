@@ -1,0 +1,20 @@
+#About the project
+
+= Introduction =
+touchpy is meant to be an python framework to develop media rich
+apps with multitouch screens.
+
+= Details =
+
+touchpy is still in early development, but its showing the possibilities
+of combining the multitouch screens with compiz/and linux environment.
+For now it's developed on linux platform but in the future it should be
+pretty easy to port it to other platforms.
+
+Right now the code is still in mess, and the python part will be rewriten
+from scrach. As we need events fired on blobIds instead on simple touch events.
+That was because one dimensional thinking, as I didn't think of multiple pointers. :)
+Anyway the code is still usable, but the problem is that events get fired on every blob
+and within the objects receiving that event, there is a need to test if the blob that is producing it is the right one.
+
+Documentation will be written as the projects gets some alpha/beta release.
