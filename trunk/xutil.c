@@ -8,8 +8,6 @@
 #include <setjmp.h>
 #include <string.h>
 
-/* $Id: xutil.c 678 2005-07-01 21:19:43Z perry $ */
-
 /* Windows and cursor manipulations not provided by Tkinter or any other
 ** standard python library
 */
