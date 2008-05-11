@@ -1,4 +1,4 @@
-#About the project
+Few lines about the project
 
 = Introduction =
 touchpy is meant to be an python framework to develop media rich
