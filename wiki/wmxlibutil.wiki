@@ -11,26 +11,26 @@ was easier to do C implementation)
 
 = Calls Implemented =
 
-* getdisplaysize()
-* getWindowID()
-* moveCursorTo(WindowID, x, y)
-* window_move(WindowID)
-* window_setsize(WindowID, x, y)
-* mouse_click(button)
-* setFocusTo(WindowID)
-* setBackingStore(WindowID)
-* getPointerPostion(WindowID)
-* getWindowAttributes(WindowID)
-* getParentID(WindowID)
-* getDeepestVisual() _returns_always_24_
-* initGraphics() _this_is_used_by_the_wmxlibutil_wrapper_to_initiate_Display
-* closeGraphics() _same_as_initGraphic_but_closes_the_display
-* getWindowUnderCursor()
-* pointer2wid(xpoint,ypoint)
+ getdisplaysize()
+ getWindowID()
+ moveCursorTo(WindowID, x, y)
+ window_move(WindowID)
+ window_setsize(WindowID, x, y)
+ mouse_click(button)
+ setFocusTo(WindowID)
+ setBackingStore(WindowID)
+ getPointerPostion(WindowID)
+ getWindowAttributes(WindowID)
+ getParentID(WindowID)
+ getDeepestVisual() _returns_always_24_
+ initGraphics() _this_is_used_by_the_wmxlibutil_wrapper_to_initiate_Display
+ closeGraphics() _same_as_initGraphic_but_closes_the_display
+ getWindowUnderCursor()
+ pointer2wid(xpoint,ypoint)
 
 =example use:=
 import wmxlibutil
 (width,height) = wmxlibutil.getdisplaysize()
 print "Display size is:",width,height
 
-*note*that*the*API*and*the*naming*will*be*probably*changed
+*note that the API and the naming will be probably changed*
