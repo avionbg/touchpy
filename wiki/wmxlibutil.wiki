@@ -29,8 +29,10 @@ was easier to do C implementation)
   * pointer2wid(xpoint,ypoint)
 
 =example use:=
+{{{
 import wmxlibutil
 (width,height) = wmxlibutil.getdisplaysize()
 print "Display size is:",width,height
+}}}
 
 *note that the API and the naming will be probably changed*
