@@ -18,3 +18,6 @@ Anyway the code is still usable, but the problem is that events get fired on eve
 and within the objects receiving that event, there is a need to test if the blob that is producing it is the right one.
 
 Documentation will be written as the projects gets some alpha/beta release.
+
+Video of the compiz plugin with touchpy in action:
+http://video.google.com/videoplay?docid=5117324530629018540&hl=en
