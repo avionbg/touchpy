@@ -9,7 +9,7 @@
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * as published by the Free Software Foundation; either version 3
  * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -23,7 +23,7 @@
  * Boston, MA  02110-1301, USA.
  */
 
-#define KEY (5679)
+#define KEY (1972)
 #define MAXBLOBS (20)
 
 #include <compiz-core.h>
@@ -41,19 +41,17 @@
 #include <pthread.h>
 
 static int displayPrivateIndex;
-// static int x, y;
-// static CompScreen *s = NULL;
 
 typedef struct
 {
-  int x, y, xo, yo, id;
+  int x, y, id;
 } command;
 
 typedef struct
 {
-  int lock;
-  command comm[MAXBLOBS];
-} tcommand;
+  command comm;
+  int alive[MAXBLOBS];
+} tuio;
 
 typedef struct _MultitouchDisplay
 {
@@ -129,7 +127,7 @@ multitouchSendInfo (CompDisplay     *d,
 // Function to send commands to other plugins
 static Bool
 sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
-		  char *pluginName, char *actionName)
+                  char *pluginName, char *actionName)
 {
   Bool pluginExists = FALSE;
   CompOption *options, *option;
@@ -146,7 +144,7 @@ sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
   if (!p || !p->vTable->getObjectOptions)
     {
       compLogMessage (d, "multitouch", CompLogLevelError,
-		      "Reporting plugin '%s' does not exist!", pluginName);
+                      "Reporting plugin '%s' does not exist!", pluginName);
       return FALSE;
     }
 
@@ -161,20 +159,20 @@ sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
   if (pluginExists)
     {
       if (option && option->value.action.initiate)
-	{
+        {
 
-	  (*option->value.action.initiate) (d,
-					    &option->value.action,
-					    0, argument, nArgument);
-	}
+          (*option->value.action.initiate) (d,
+                                            &option->value.action,
+                                            0, argument, nArgument);
+        }
       else
-	{
+        {
 
-	  compLogMessage (d, "multitouch", CompLogLevelError,
-			  "Plugin '%s' does exist, but no option named '%s' was found!",
-			  pluginName, actionName);
-	  return FALSE;
-	}
+          compLogMessage (d, "multitouch", CompLogLevelError,
+                          "Plugin '%s' does exist, but no option named '%s' was found!",
+                          pluginName, actionName);
+          return FALSE;
+        }
     }
 
   return TRUE;
@@ -182,8 +180,8 @@ sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
 
 static Bool
 multitouchToggle (CompDisplay * d,
-		  CompAction * action,
-		  CompActionState state, CompOption * option, int nOption)
+                  CompAction * action,
+                  CompActionState state, CompOption * option, int nOption)
 {
 
   MULTITOUCH_DISPLAY (d);
@@ -231,11 +229,11 @@ makeripple (void *data)
 
   arg[nArg].name = "amplitude";
   arg[nArg].type = CompOptionTypeFloat;
-  arg[nArg].value.i = 0.5f;	// 0.25f za point,0.5f za line
+  arg[nArg].value.i = 0.5f;     // 0.25f za point,0.5f za line
 
   sendInfoToPlugin (dv->display, arg, nArg, "water", "line");
   free (dv);
-  return FALSE;			// Return False so the timeout gets removed upon first callback
+  return FALSE;                 // Return False so the timeout gets removed upon first callback
 }
 
 static Bool
@@ -245,39 +243,39 @@ makeannotate (void *data)
   CompScreen *s;
   s = findScreenAtDisplay (dv->display, currentRoot);
   if (s)
-  {
-  CompOption arg[7];
-  int nArg = 0;
+    {
+      CompOption arg[7];
+      int nArg = 0;
 
-  arg[nArg].name = "root";
-  arg[nArg].type = CompOptionTypeInt;
-  arg[nArg].value.i = s->root;
-  nArg++;
+      arg[nArg].name = "root";
+      arg[nArg].type = CompOptionTypeInt;
+      arg[nArg].value.i = s->root;
+      nArg++;
 
-  arg[nArg].name = "tool";
-  arg[nArg].type = CompOptionTypeString;
-  arg[nArg].value.s = "line";
-  nArg++;
+      arg[nArg].name = "tool";
+      arg[nArg].type = CompOptionTypeString;
+      arg[nArg].value.s = "line";
+      nArg++;
 
-  arg[nArg].name = "x1";
-  arg[nArg].type = CompOptionTypeFloat;
-  arg[nArg].value.f = (float) dv->x0;
-  nArg++;
+      arg[nArg].name = "x1";
+      arg[nArg].type = CompOptionTypeFloat;
+      arg[nArg].value.f = (float) dv->x0;
+      nArg++;
 
-  arg[nArg].name = "y1";
-  arg[nArg].type = CompOptionTypeFloat;
-  arg[nArg].value.f = (float) dv->y0;
-  nArg++;
+      arg[nArg].name = "y1";
+      arg[nArg].type = CompOptionTypeFloat;
+      arg[nArg].value.f = (float) dv->y0;
+      nArg++;
 
-  arg[nArg].name = "x2";
-  arg[nArg].type = CompOptionTypeFloat;
-  arg[nArg].value.f = (float) dv->x1;
-  nArg++;
+      arg[nArg].name = "x2";
+      arg[nArg].type = CompOptionTypeFloat;
+      arg[nArg].value.f = (float) dv->x1;
+      nArg++;
 
-  arg[nArg].name = "y2";
-  arg[nArg].type = CompOptionTypeFloat;
-  arg[nArg].value.f = (float) dv->y1;
-  nArg++;
+      arg[nArg].name = "y2";
+      arg[nArg].type = CompOptionTypeFloat;
+      arg[nArg].value.f = (float) dv->y1;
+      nArg++;
 
 // TODO: Check what's the format of ComOptionTypeColor
 // for black it would be something like
@@ -293,14 +291,14 @@ makeannotate (void *data)
 //   arg[nArg].type = CompOptionTypeColor;
 //   arg[nArg].value.c = c;
 
-  arg[nArg].name = "line_width";
-  arg[nArg].type = CompOptionTypeFloat;
-  arg[nArg].value.f = 1.5f;
+      arg[nArg].name = "line_width";
+      arg[nArg].type = CompOptionTypeFloat;
+      arg[nArg].value.f = 1.5f;
 
-  sendInfoToPlugin (dv->display, arg, nArg, "annotate", "draw");
-  }
+      sendInfoToPlugin (dv->display, arg, nArg, "annotate", "draw");
+    }
   free (dv);
-  return FALSE;			// Return False so the timeout gets removed upon first callback
+  return FALSE;                 // Return False so the timeout gets removed upon first callback
 }
 
 static Bool
@@ -334,7 +332,22 @@ displaytext (void *data)
 
   sendInfoToPlugin (dv->display, arg, nArg, "prompt", "display_text");
   free (dv);
-  return FALSE;			// Return False so the timeout gets removed upon first callback
+  return FALSE;                 // Return False so the timeout gets removed upon first callback
+}
+
+// Check if a value is part of set
+int
+isMemberOfSet (int *Set, int size, int value)
+{
+  int i;
+  for (i = 0; i < size; ++i)
+    {
+      if (value == Set[i])
+        {
+          return 1;
+        }
+    }
+  return 0;
 }
 
 // Thread which is used to read commands sent over
@@ -345,7 +358,9 @@ multitouchThread (void *display)
   CompDisplay *d = (CompDisplay *) display;
   MULTITOUCH_DISPLAY (d);
   int shmid, semid, retval, i;
-  tcommand *tcomm;
+  tuio *tcomm;
+  command *tuio_cmd;
+  command blob[MAXBLOBS] = { (int) NULL, (int) NULL, (int) NULL };
   struct sembuf operations[1];
   union semun
   {
@@ -359,34 +374,34 @@ multitouchThread (void *display)
   if (shmid == -1)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Error in allocating shm (error code: %d).", shmid);
+                      "Error in allocating shm (error code: %d).", shmid);
       return FALSE;
-    }				//if
+    }                           //if
   tcomm = shmat (shmid, NULL, 0);
   if (tcomm == (void *) -1)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Error attaching memory(error code: %d).", tcomm);
+                      "Error attaching memory(error code: %d).", tcomm);
       return FALSE;
-    }				//if
+    }                           //if
 
 // Semaphore init
   semid = semget (KEY, 1, 0666 | IPC_CREAT);
   if (semid < 0)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Cannot find semaphore, exiting.(error code: %d).",
-		      semid);
+                      "Cannot find semaphore, exiting.(error code: %d).",
+                      semid);
       return FALSE;
     }
   if (semctl (semid, 0, SETVAL, argument) < 0)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Cannot set semaphore value.");
+                      "Cannot set semaphore value.");
       return FALSE;
     }
 // Thread loop
-  do
+  while (1)
     {
       operations[0].sem_num = 0;
       operations[0].sem_op = -1;
@@ -397,77 +412,83 @@ multitouchThread (void *display)
       pthread_mutex_lock (&md->lock);
 // Check If we have end flag set
       if (md->endThread)
-	{
+        {
 // We have end flag set, exit from loop and join with main thread
-	  pthread_mutex_unlock (&md->lock);
-	  break;
-	}
+          pthread_mutex_unlock (&md->lock);
+          break;
+        }
 // Unlock the mutex
       pthread_mutex_unlock (&md->lock);
 // Continue with standard processing
-      for (i = 0; i < MAXBLOBS; ++i)
-	{
-	  command *p = &(tcomm->comm[i]);
-// Check for blobID, If there isn't any, it's void so skip it   
-	  if (p->id)
-	    {
-// Check if there is old x and y, it's enough to check just one
-	      if (p->xo)
-		{
-		  printf ("num:%d,X:%d,Y:%d,Xo:%d,Yo:%d,Id:%d\n",
-			  i, p->x, p->y, p->xo, p->yo, p->id);
+      tuio_cmd = &(tcomm->comm);
+      int found = 0;
+      int slot = 0;
+      for (i = 0; i < MAXBLOBS; i++)
+        {
+          if (blob[i].id)
+            {
+// check if we have blobs that alive packet doesn't have (deleted blob)
+              if (!(isMemberOfSet (tcomm->alive, MAXBLOBS, blob[i].id)))
+                {
+                  blob[i].id = 0;
+                  blob[i].x = 0;
+                  blob[i].y = 0;
+// no slot allocated (we are 0th member)
+                  if (!slot)
+                    slot = i + 1;
+                  break;
+                }
+            } // if
+// to avoid 0 triggering again this condition, add 1 to i
+          else if (!slot)
+            slot = i + 1;
+        } // for
 
-		  DisplayValue *dv = malloc (sizeof (DisplayValue));
-		  if (!dv)
-		    return FALSE;
-		  dv->display = d;
-		  dv->x0 = p->x;
-		  dv->y0 = p->y;
-		  dv->x1 = p->xo;
-		  dv->y1 = p->yo;
-		  md->timeoutHandles = compAddTimeout (0, makeannotate, dv);
-		}
-	      else
-		{
-		  printf ("num:%d,X:%d,Y:%d,Id:%d\n",
-			  i, p->x, p->y, p->id);
-		  DisplayValue *dv = malloc (sizeof (DisplayValue));
-		  if (!dv)
-		    return FALSE;
-		  dv->display = d;
-		  dv->x0 = p->x;
-		  dv->y0 = p->y;
-		  dv->x1 = p->x;
-		  dv->y1 = p->y;
-		  md->timeoutHandles = compAddTimeout (0, makeannotate, dv);
-		}
-	    }			//if
-	}			//for
+      for (i = 0; i < MAXBLOBS; i++)
+        {
+// we are already in the list, su just update x,y
+          if (blob[i].id == tuio_cmd->id)
+            {
+              blob[i].x = tuio_cmd->x;
+              blob[i].y = tuio_cmd->y;
+              found = 1;
+              break;
+            }
+          else
+            found = 0;
+        } // for
+
+// do we have free slot and new blob?
+      if (slot && !found)
+        {
+          memcpy (&(blob[(slot - 1)]), tuio_cmd, sizeof (*tuio_cmd));   // copy the blob into slot position
+        }
+
+
       operations[0].sem_num = 0;
       operations[0].sem_op = -1;
       operations[0].sem_flg = 0;
       retval = semop (semid, operations, 1);
     }
-  while (!tcomm->lock);
 
   if (semctl (semid, 0, IPC_RMID, 0) < 0)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Cannot delete semaphore.");
+                      "Cannot delete semaphore.");
       return FALSE;
     }
   if (shmdt (tcomm) == -1)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Error detaching shared memory.");
+                      "Error detaching shared memory.");
       return FALSE;
-    }				//if
+    }                           //if
   if (shmctl (shmid, IPC_RMID, 0) == -1)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Error: shmctl(IPC_RMID) failed.");
+                      "Error: shmctl(IPC_RMID) failed.");
       return FALSE;
-    }				//if
+    }                           //if
   return (int) NULL;
 }
 
@@ -482,12 +503,12 @@ multitouchInitThread (CompDisplay * d)
   pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
   status =
       pthread_create (&md->eventsThread, &attr, multitouchThread,
-		      (void *) d);
+                      (void *) d);
   pthread_attr_destroy (&attr);
   if (status)
     {
       compLogMessage (d, "multitouch", CompLogLevelFatal,
-		      "Could not start thread (error code: %d).", status);
+                      "Could not start thread (error code: %d).", status);
       return FALSE;
     }
   return TRUE;
@@ -557,7 +578,7 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
 static void
 multitouchFiniDisplay (CompPlugin * p, CompDisplay * d)
 {
-  int status, id;//, retval, i;
+  int status, id;               //, retval, i;
   MULTITOUCH_DISPLAY (d);
   union semun
   {
@@ -579,26 +600,26 @@ multitouchFiniDisplay (CompPlugin * p, CompDisplay * d)
 // Prepairing the thread, unpause the semaphore in case it's waiting
       id = semget (KEY, 1, 0666);
       if (id < 0)
-	{
-	  compLogMessage (d, "multitouch", CompLogLevelError,
-			  "Error: Cannot find semaphore on FiniDisplay (error code : %d).",
-			  id);
-	}
+        {
+          compLogMessage (d, "multitouch", CompLogLevelError,
+                          "Error: Cannot find semaphore on FiniDisplay (error code : %d).",
+                          id);
+        }
       if (semctl (id, 0, SETVAL, argument) < 0)
-	{
-	  compLogMessage (d, "multitouch", CompLogLevelFatal,
-			  "In multitouchFiniDisplay Cannot set semaphore value.");
-// 	  return FALSE;
-	}
+        {
+          compLogMessage (d, "multitouch", CompLogLevelFatal,
+                          "In multitouchFiniDisplay Cannot set semaphore value.");
+//        return FALSE;
+        }
 // Now unlock the mutex and wait for child thread to join
 
       pthread_mutex_unlock (&md->lock);
 
       status = pthread_join (md->eventsThread, NULL);
       if (status)
-	compLogMessage (d, "multitouch", CompLogLevelError,
-			"pthread_join () failed (error code : %d).",
-			status);
+        compLogMessage (d, "multitouch", CompLogLevelError,
+                        "pthread_join () failed (error code : %d).",
+                        status);
     }
   pthread_mutex_destroy (&md->lock);
 // Free the pointer
@@ -609,7 +630,7 @@ static CompBool
 multitouchInitObject (CompPlugin * p, CompObject * o)
 {
   static InitPluginObjectProc dispTab[] = {
-    (InitPluginObjectProc) 0,	/* InitCore */
+    (InitPluginObjectProc) 0,   /* InitCore */
     (InitPluginObjectProc) multitouchInitDisplay,
     (InitPluginObjectProc) multitouchInitScreen
   };
