@@ -449,6 +449,15 @@ multitouchThread (void *display)
 // we are already in the list, su just update x,y
           if (blob[i].id == tuio_cmd->id)
             {
+	      DisplayValue *dv = malloc (sizeof (DisplayValue));
+	      if (!dv)
+	             return FALSE;
+	      dv->display = d;
+	      dv->x0 = blob[i].x;
+	      dv->y0 = blob[i].y;
+	      dv->x1 = tuio_cmd->x;
+	      dv->y1 = tuio_cmd->y;
+	      md->timeoutHandles = compAddTimeout (0, makeannotate, dv);
               blob[i].x = tuio_cmd->x;
               blob[i].y = tuio_cmd->y;
               found = 1;
