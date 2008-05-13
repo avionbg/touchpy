@@ -33,13 +33,20 @@ class Tuio2DCursor(TuioObject):
     def __init__(self, sessionid):
         super(Tuio2DCursor, self).__init__(sessionid)
         self.sessionid = sessionid
-        self.xpos = self.ypos = self.xmot = self.ymot = self.mot_accel = 0.0
+        self.xpos = self.ypos = self.xmot = self.ymot = self.mot_accel = self.Width = self.Height = 0.0
+	self.oxpos = self.oypos = self.oxmot = self.oymot = self.omot_accel = self.oWidth = self.oHeight = 0.0
     
     def update(self, sessionid, args):
         if len(args) == 5:
             self.sessionid = sessionid
+	    self.oxpos, self.oypos, self.oxmot, self.oymot, self.omot_accel = self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel
             self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
+        elif len(args) == 7:
+            self.sessionid = sessionid
+            self.oxpos, self.oypos, self.oxmot, self.oymot, self.omot_accel, self.oWidth , self.oHeight = self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height
+            self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
         else:
+            #print args ,sessionid
             raise UpdateError
 
     def _label(self):
