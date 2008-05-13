@@ -5,7 +5,7 @@
  * Author : Goran Medakovic
  * Email : avion.bg@gmail.com
  *
- * Copyright (c) 2008 Goran Medakovic <goran.it@gmail.com>
+ * Copyright (c) 2008 Goran Medakovic <avion.bg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
