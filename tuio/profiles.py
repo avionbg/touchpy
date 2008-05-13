@@ -59,6 +59,7 @@ class Tuio2DcurProfile(TuioProfile):
         self.objects[sessionid].update(sessionid, message[4:])
 
     def alive(self, client, message):
+	#print message
         if client.refreshed():
             self.sessions = message[3:]
             for obj in self.objects.keys():
