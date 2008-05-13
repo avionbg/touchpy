@@ -1,0 +1,5 @@
+touchpy and compiz tuio/smh plugin
+----------------------------------
+touchpy is in pre-alpha release, if you wan't you can anyway try it.
+Its actually easy to use, just fire your TUIO providing app (TUIO simulator/touchlib/reactivision)
+and after that use mouse.py or dragwindows.py.
