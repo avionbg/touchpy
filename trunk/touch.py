@@ -16,7 +16,8 @@ class touchlib(event.EventDispatcher):
 		global tracking,old_blobs,new_blobs,old_tobje
 		self.host = host
 		self.port = port
-		old_blobs = []
+		self.old_blobs = []
+		self.new_blobs = []
 		old_tobje = {}
 		#try:
 		tracking = tuio.Tracking(host=self.host, port=self.port)
@@ -26,13 +27,13 @@ class touchlib(event.EventDispatcher):
 		tracking.stop()
 
 	def dispatch_events(self):
-		global old_blobs, old_tobje
+		global old_tobje
 		tracking.update()
-		new_blobs = tracking.profiles['/tuio/2Dcur'].sessions
-		if new_blobs != old_blobs:
-			touch_release = difference(old_blobs,new_blobs)
-			touch_down = difference(new_blobs,old_blobs)
-			touch_move = intersection(old_blobs,new_blobs)
+		self.new_blobs = tracking.profiles['/tuio/2Dcur'].sessions
+		if self.new_blobs != self.old_blobs:
+			touch_release = difference(self.old_blobs,self.new_blobs)
+			touch_down = difference(self.new_blobs,self.old_blobs)
+			touch_move = intersection(self.old_blobs,self.new_blobs)
 			if touch_release:
 				for blobID in touch_release:
 					self.dispatch_event('on_touchup', blobID, old_tobje[blobID].xpos, old_tobje[blobID].ypos)
@@ -46,9 +47,9 @@ class touchlib(event.EventDispatcher):
 				for blobID in touch_move:
 					tobject = tracking.profiles['/tuio/2Dcur'].objects[blobID]
 					self.dispatch_event('on_touchmove', tobject)
-			old_blobs = new_blobs
+			self.old_blobs = self.new_blobs
 		else:
-			for blobID in new_blobs:
+			for blobID in self.new_blobs:
 				tobje = tracking.profiles['/tuio/2Dcur'].objects[blobID]
 				if ( (old_tobje[blobID].xpos != tobje.xpos) and (old_tobje[blobID].ypos != tobje.ypos) ):
 					self.dispatch_event('on_touchmove', tobje)
@@ -77,29 +78,29 @@ class tdown(Observer):
 	pass
 
 
-if __name__ == "__main__":
-	t = touchlib()
-	import wutil
-	DEBUG = 0
-	td = tdown(t)
+#if __name__ == "__main__":
+	#t = touchlib()
+	#import wutil
+	#DEBUG = 0
+	#td = tdown(t)
 	#print wutil.pointer2wid(200,200)
 	
-	def movewin(x,y):
-		#wutil.window_move(67108915,x,y)
-		print wutil.getWindowUnderCursor()
+	#def movewin(x,y):
+		##wutil.window_move(67108915,x,y)
+		#print wutil.getWindowUnderCursor()
 
-	while True:
-		t.dispatch_events()
-	@t.event
-	def on_touchdown(tobject):
-		if DEBUG: print 'blob press detected: ', tobject.sessionid, tobject.xpos, tobject.ypos
+	#while True:
+		#t.dispatch_events()
+	#@t.event
+	#def on_touchdown(tobject):
+		#if DEBUG: print 'blob press detected: ', tobject.sessionid, tobject.xpos, tobject.ypos
 
-	@t.event
-	def on_touchup(blobID, xpos, ypos):
-		if DEBUG: print 'blob release detected: ', blobID, xpos, ypos
+	#@t.event
+	#def on_touchup(blobID, xpos, ypos):
+		#if DEBUG: print 'blob release detected: ', blobID, xpos, ypos
 
-	@t.event
-	def on_touchmove(tobject):
-		if DEBUG: print 'blob move detected: ', tobject.sessionid, tobject.xpos, tobject.ypos
-		movewin (int(tobject.xpos * 1650), int(tobject.ypos *1050))
+	#@t.event
+	#def on_touchmove(tobject):
+		#if DEBUG: print 'blob move detected: ', tobject.sessionid, tobject.xpos, tobject.ypos
+		#movewin (int(tobject.xpos * 1650), int(tobject.ypos *1050))
 
