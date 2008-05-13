@@ -68,6 +68,23 @@ int MyXlibIOErrorHandler(Display *d) {
   return 0;
 }
 
+static getdisplaysize(int *width, int *height)
+{
+	*width = WidthOfScreen (DefaultScreenOfDisplay (d));
+	*height = HeightOfScreen (DefaultScreenOfDisplay (d));
+}
+
+PyObject *wrap_getdisplaysize(PyObject *self, PyObject *args) {
+  int x, y;
+  if (!PyArg_ParseTuple(args,"ii", &x, &y))
+    return NULL;
+  TrapXlibErrors /* macro code to handle xlib exceptions */
+  getdisplaysize((void *) x,(void *) y);
+  RestoreOldXlibErrorHandlers /* macro */
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
 void moveCursorTo(int win, int x, int y) {
   Window w;
   /*  Display *XOpenDisplay(char *); */
@@ -178,9 +195,7 @@ PyObject *wrap_pointer2wid(PyObject *self, PyObject *args) {
    return Py_BuildValue("i", (int) wid);
 }
 
-static getsize(win, wp, hp)
-	Window win;
-	int *wp, *hp;
+static getsize(Window win, int *wp, int *hp)
 {
 	XWindowAttributes attributes;
 
@@ -202,15 +217,14 @@ PyObject *wrap_getsize(PyObject *self, PyObject *args) {
   return Py_None;
 }
 
-void window_setsize(win, w, h)
-    Window win;
-    int w, h;
+void window_setsize(Window win, int w, int h)
 {
     XWindowChanges values;
     unsigned int value_mask;
     int try;
     int nw, nh;
-    Display *display = XOpenDisplay(NULL);
+    Display *display = d;
+// 	XOpenDisplay(NULL);
     screen_num = DefaultScreen(d);
     values.width = w;
     values.height = h;
@@ -242,7 +256,7 @@ void window_setsize(win, w, h)
 	fprintf(stderr, "resize: XReconfigureWMWindow 2");
 // 	XFlush(display);
 	XSync(display, True);
-	XCloseDisplay(display);
+// 	XCloseDisplay(display);
 }
 
 PyObject *wrap_window_setsize(PyObject *self, PyObject *args) {
@@ -296,7 +310,8 @@ PyObject *wrap_getWindowID(PyObject *self, PyObject *args) {
 }
 
 void mouse_click(int button) {
-	Display *display = XOpenDisplay(NULL);
+	Display *display = d;
+// 	XOpenDisplay(NULL);
 	XEvent event;
 
 	memset(&event, 0x00, sizeof(event));
@@ -346,7 +361,7 @@ void mouse_click(int button) {
 		fprintf(stderr, "XSendEvent()\n");
 
 	XFlush(display);
-	XCloseDisplay(display);
+// 	XCloseDisplay(display);
 }
 
 PyObject *wrap_mouse_click(PyObject *self, PyObject *args) {
@@ -650,6 +665,7 @@ PyObject *wrap_drawCursor(PyObject *self, PyObject *args) {
 
 static PyMethodDef xutilMethods[] = {
   { "pointer2wid",wrap_pointer2wid, 1},
+  { "getdisplaysize",wrap_getdisplaysize, 1},
   { "moveCursorTo",wrap_moveCursorTo, 1},
   { "getWindowUnderCursor", wrap_getWindowUnderCursor, 1},
   { "getsize",wrap_getsize, 1},

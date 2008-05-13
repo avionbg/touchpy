@@ -2,9 +2,6 @@
 possible in Tkinter.
 These are python stubs that are overloaded by a c version implementations.
 If the c versions do not exist, then these routines will do nothing
-
-
-$Id: wutil.py 791 2007-04-20 14:05:08Z sontag $
 """
 
 import struct, fcntl, sys, os
