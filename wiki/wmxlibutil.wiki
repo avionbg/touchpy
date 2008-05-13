@@ -23,8 +23,8 @@ was easier to do C implementation)
   * getWindowAttributes(WindowID)
   * getParentID(WindowID)
   * getDeepestVisual() _returns_always_24_
-  * initGraphics() _this_is_used_by_the_wmxlibutil_wrapper_to_initiate_Display
-  * closeGraphics() _same_as_initGraphic_but_closes_the_display
+  * initGraphics() _this is used by the wmxlibutil wrapper to initiate Display
+  * closeGraphics() _same as initGraphic but closes the display
   * getWindowUnderCursor()
   * pointer2wid(xpoint,ypoint)
 
