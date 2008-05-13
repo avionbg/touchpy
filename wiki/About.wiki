@@ -21,3 +21,6 @@ Documentation will be written as the projects gets some alpha/beta release.
 
 Video of the compiz plugin with touchpy in action:
 http://video.google.com/videoplay?docid=5117324530629018540&hl=en
+
+Moving windows with touchpy
+http://video.google.com/videoplay?docid=-6433132392970567985&hl=en
