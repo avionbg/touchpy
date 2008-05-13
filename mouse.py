@@ -1,6 +1,9 @@
 #!/usr/bin/python -u
-
+"""
+example mouse emulation with touchpy
+"""
 from touch import touchlib
+import wmxlibutil
 
 class Observer(object):
 	def __init__(self, subject):
@@ -8,29 +11,29 @@ class Observer(object):
 
 class touch_up(Observer):
 	def on_touchup(self,blobID, xpos, ypos):
-		print 'blob release detected: ', blobID, xpos, ypos
+		if DEBUG: print 'blob release detected: ', blobID, xpos, ypos
+		wmxlibutil.mouse_click(1) #change this to have another button clicked
 		pass
 
 class touch_down(Observer):
 	def on_touchdown(self,blobID):
-		print 'blob press detected: ', blobID.sessionid, blobID.xpos, blobID.ypos
+		if DEBUG: print 'blob press detected: ', blobID.sessionid, blobID.xpos, blobID.ypos
+		wmxlibutil.moveCursorTo(0,int(blobID.xpos*width),int(blobID.ypos*height))
 		pass
+
 class touch_move(Observer):
 	def on_touchmove(self,blobID):
-		#tuio_cmd.comm.xo=int(blobID.oxpos * 1650)
-		#tuio_cmd.comm.yo=int(blobID.oypos * 1050)
-		#print "blobs move:", int(blobID.xpos * 1650), int(blobID.ypos *1050)
-		#print "old:",int(blobID.oxpos * 1650)
+		if DEBUG: print 'blob move detected: ', blobID.sessionid, blobID.xpos, blobID.ypos
+		wmxlibutil.moveCursorTo(0,int(blobID.xpos*width),int(blobID.ypos*height))
 		pass
+
+(width,height) = wmxlibutil.getdisplaysize()
 
 t = touchlib()
 tu = touch_up(t)
 td = touch_down(t)
 tm = touch_move(t)
-windows = {}
-wid = {}
-
-
+DEBUG = 1
 
 try:
 	while True:
