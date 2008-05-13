@@ -68,21 +68,26 @@ int MyXlibIOErrorHandler(Display *d) {
   return 0;
 }
 
-static getdisplaysize(int *width, int *height)
+void getdisplaysize(int *width,int *height)
 {
+  if (d == NULL) {
+    printf("could not open XWindow display\n");
+    return;
+  }
 	*width = WidthOfScreen (DefaultScreenOfDisplay (d));
 	*height = HeightOfScreen (DefaultScreenOfDisplay (d));
+	return 0;
 }
 
 PyObject *wrap_getdisplaysize(PyObject *self, PyObject *args) {
-  int x, y;
-  if (!PyArg_ParseTuple(args,"ii", &x, &y))
-    return NULL;
+  int *x, *y;
   TrapXlibErrors /* macro code to handle xlib exceptions */
-  getdisplaysize((void *) x,(void *) y);
+  getdisplaysize(&x,&y);
   RestoreOldXlibErrorHandlers /* macro */
-  Py_INCREF(Py_None);
-  return Py_None;
+//   Py_INCREF(Py_None);
+int width = x;
+int height = y;
+  return Py_BuildValue("ii", width , height);
 }
 
 void moveCursorTo(int win, int x, int y) {

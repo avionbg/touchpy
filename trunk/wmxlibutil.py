@@ -6,7 +6,7 @@ If the c versions do not exist, then these routines will do nothing
 
 import struct, fcntl, sys, os
 #from irafglobals import IrafError
-
+def getdisplaysize(): pass
 def getWindowID(): return None
 def moveCursorTo(WindowID, x, y): pass
 def window_move(WindowID): pass
@@ -70,7 +70,7 @@ except ImportError:
             magicConstant = 1074275912
     else:
         raise ImportError(
-                "wutil.py: Needs definition of TIOCGWINSZ constant for platform %s"
+                "wmxlibutil.py: Needs definition of TIOCGWINSZ constant for platform %s"
                 % platform)
 
 class IrafError(Exception):
@@ -256,8 +256,8 @@ class FocusController:
     to when asked to restore the previous focus and cursor position. The
     details of doing it for different windows are encapsulated in descendants
     of the FocusEntity objects that it contains. Since this is properly
-    a singleton, it is created by the wutil module itself and accessed
-    as an object of wutil"""
+    a singleton, it is created by the wmxlibutil module itself and accessed
+    as an object of wmxlibutil"""
 
     def __init__(self, termwindow):
         self.focusEntities = {'terminal':termwindow}
