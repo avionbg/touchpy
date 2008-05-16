@@ -1,14 +1,52 @@
 <compiz>
-  <plugin name="multitouch" useBcop="true">
-    <_short>Multitouch input</_short>
-    <_long>Use multitouch screens trough tuio protocol to drive various plugins</_long>
-    <category>Desktop</category>
-    <display>
-          <option name="toggle_key" type="key">
-                <_short>Toggle display</_short>
-                <_long>Toggle display.</_long>
-                <default>&lt;Super&gt;V</default>
-           </option>
-    </display>
-  </plugin>
+	<plugin name="multitouch" useBcop="true">
+		<_short>Multitouch input</_short>
+		<_long>Use multitouch screens trough tuio protocol to drive various plugins</_long>
+		<category>Accessibility</category>
+		<display>
+			<group>
+				<short>Tuio handling</short>
+				<option name="toggle_tuio" type="key">
+					<_short>Toggle raw tuio parsing</_short>
+					<_long>Toggle raw tuio parsing instead receiving commands from shared memory.</_long>
+					<default>&lt;Super&gt;F8</default>
+				</option>
+				<option name="port" type="int">
+					<_short>Tuio Port</_short>
+					<_long>Tuio Port on which we should listen for the messages.</_long>
+					<default>3333</default>
+					<min>1024</min>
+					<max>65535</max>
+				</option>
+				<subgroup>
+					<short>Forwarding messages</short>
+					<option name="toggle_forw" type="bool">
+						<_short>Toggle tuio forwarding</_short>
+						<_long>Toggle forwarding of tuio messages to other port.</_long>
+						<default>true</default>
+					</option>
+					<option name="fwdport" type="int">
+						<_short>Tuio fwd Port</_short>
+						<_long>Port on which tuio messages are forwarded.</_long>
+						<default>3300</default>
+						<min>1024</min>
+						<max>65535</max>
+					</option>
+				</subgroup>
+			</group>
+			<group>
+				<short>Key Bindings</short>
+				<option name="toggle_annotate" type="key">
+					<_short>Toggle annotate</_short>
+					<_long>Toggle using annotate plugin to draw on the screen.</_long>
+					<default>&lt;Super&gt;F9</default>
+				</option>
+				<option name="toggle_ripple" type="key">
+					<_short>Toggle ripple</_short>
+					<_long>Toggle using water plugin to draw ripples effect on the screen.</_long>
+					<default>&lt;Super&gt;F10</default>
+				</option>
+			</group>
+		</display>
+	</plugin>
 </compiz>
