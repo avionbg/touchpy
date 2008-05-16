@@ -374,7 +374,7 @@ isMemberOfSet (int *Set, int size, int value)
 }
 
 static int tuio_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                       void *data, void *user_data)
+                        void *data, void *user_data)
 {
 //    MULTITOUCH_SCREEN (findScreenAtDisplay(firstDisplay,currentRoot));
     MULTITOUCH_DISPLAY (firstDisplay);
@@ -414,12 +414,12 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
 // do we have free slot and new blob?
         if (slot && !found)
         {
-          blobs[(slot -1)].id = argv[1]->i;
-          blobs[(slot -1)].x = argv[2]->f;
-          blobs[(slot -1)].y = argv[3]->f;
-          blobs[(slot -1)].xmot = argv[4]->f;
-          blobs[(slot -1)].ymot = argv[5]->f;
-          blobs[(slot -1)].mot_accel = argv[6]->f;
+            blobs[(slot -1)].id = argv[1]->i;
+            blobs[(slot -1)].x = argv[2]->f;
+            blobs[(slot -1)].y = argv[3]->f;
+            blobs[(slot -1)].xmot = argv[4]->f;
+            blobs[(slot -1)].ymot = argv[5]->f;
+            blobs[(slot -1)].mot_accel = argv[6]->f;
         }
     }
     else if ( !strcmp((char *) argv[0],"alive"))
@@ -431,7 +431,7 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
             alive[i-1] = argv[i]->i;
         }
 //        printf("\n");
-                for (i = 0; i < MAXBLOBS; i++)
+        for (i = 0; i < MAXBLOBS; i++)
         {
             if (blobs[i].id)
             {
@@ -455,11 +455,12 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
     }
     else
     {
-      for (i=0; i<argc; i++) { //not handled messagess
-        printf("arg %d '%c' ", i, types[i]);
-        lo_arg_pp(types[i], argv[i]);
-        printf("\n");
-      }
+        for (i=0; i<argc; i++)   //not handled messagess
+        {
+            printf("arg %d '%c' ", i, types[i]);
+            lo_arg_pp(types[i], argv[i]);
+            printf("\n");
+        }
     }
     return 0;
 }
@@ -673,7 +674,7 @@ multitouchInitScreen (CompPlugin * p, CompScreen * s)
 {
     MultitouchScreen *ms;
     MULTITOUCH_DISPLAY (s->display);
-	  char port[6];
+    char port[6];
     sprintf (port,"%d",multitouchGetPort (s->display));
 
     ms = malloc (sizeof (MultitouchScreen));
@@ -772,13 +773,11 @@ multitouchFiniDisplay (CompPlugin * p, CompDisplay * d)
 // Now unlock the mutex and wait for child thread to join
         }
         pthread_mutex_unlock (&md->lock);
-        printf ("*********************DEBUG**************** EXITING2\n");
         status = pthread_join (md->eventsThread, NULL);
         if (status)
             compLogMessage (d, "multitouch", CompLogLevelError,
                             "pthread_join () failed (error code : %d).",
                             status);
-        else printf ("*********************DEBUG****************  KUL3\n");
     }
     pthread_mutex_destroy (&md->lock);
 // Free the private index
@@ -805,7 +804,7 @@ multitouchFiniObject (CompPlugin * p, CompObject * o)
 {
     static FiniPluginObjectProc dispTab[] =
     {
-        (FiniPluginObjectProc) 0,
+        (FiniPluginObjectProc) multitouchFiniCore,
         (FiniPluginObjectProc) multitouchFiniDisplay,
         (FiniPluginObjectProc) multitouchFiniScreen
     };
