@@ -135,12 +135,12 @@ multitouchSendInfo (CompDisplay     *d,
 
 /*
  * get the topmost xlib window id from x,y coordinates
- * name: pointer2wid
+ * name: point2wid
  * @param pointx,pointy
  * @return wid
  */
 
-static int pointer2wid( int pointx, int pointy)
+static int point2wid( int pointx, int pointy)
 {
 // To do this properly, we need to open another client connection to xlib
 // to prevent accidentall locks and segfaults as this is threaded call
@@ -456,14 +456,19 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
                 found = 1;
+                if ( blobs[j].wid )
+                {
+                    int dx =  (dv->x1 - dv->x0) * s->width;
+                    int dy =  (dv->y1 - dv->y0) * s->height;
+                    moveWindow((CompWindow * ) blobs[j].cwid, dx, dy, 1, 1);
+                    //printf("movewindow id: %d, x%d , y:%d\n", blobs[j].wid, dx,dy );
+                }
                 break;
             }
         } // for
-// do we have free slot and new blob? (touch down handler)
+// do we have new blob? (touch down handler)
         if (!found)
         {
-            //int wid = pointer2wid((int) s->width * argv[2]->f,(int) s->height * argv[3]->f);
-            //printf ("wid:%d \n", wid);
             int slot = -1;
             for (j=0; j<MAXBLOBS;j++)
             {
@@ -476,12 +481,21 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
             printf("down handler: slot: %d blobID: %d\n",slot,argv[1]->i);
             if (slot != -1)
             {
+                int wid = point2wid((int) s->width * argv[2]->f,(int) s->height * argv[3]->f);
+                //printf ("wid:%d \n", wid);
                 blobs[j].id = argv[1]->i;
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
                 blobs[j].xmot = argv[4]->f;
                 blobs[j].ymot = argv[5]->f;
                 blobs[j].mot_accel = argv[6]->f;
+                if (wid)
+                {
+                    blobs[j].wid = wid;
+                    blobs[j].cwid = (int) findWindowAtDisplay (firstDisplay, wid);
+                    CompWindow * cxid = (CompWindow *) blobs[j].cwid;
+                    windowGrabNotify(cxid,(int) blobs[j].x * s->width ,(int) blobs[j].y * s->height,cxid->state ,CompWindowGrabButtonMask);
+                }
             }
         }
     }
@@ -498,10 +512,17 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
 // check if we have blobs that alive packet doesn't have (touch up handler)
                 if (!(isMemberOfSet (alive, MAXBLOBS, blobs[j].id)))
                 {
+                    if (blobs[j].cwid)
+                        {
+                        windowUngrabNotify((CompWindow * ) blobs[j].cwid);
+                        syncWindowPosition((CompWindow * ) blobs[j].cwid);
+                        }
                     printf("up handler - blobID: %d\n",blobs[j].id);
                     blobs[j].id = 0;
                     blobs[j].x = 0;
                     blobs[j].y = 0;
+                    blobs[j].wid = 0;
+                    blobs[j].cwid = 0;
                     break;
                 }
             } // if
@@ -775,6 +796,8 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
     for (j=0;j<MAXBLOBS;j++)
     {
         md->blob[j].id = 0;
+        md->blob[j].wid = 0;
+        md->blob[j].cwid = 0;
     }
 
     md->tuioenabled = FALSE;
