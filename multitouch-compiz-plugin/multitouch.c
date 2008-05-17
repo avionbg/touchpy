@@ -44,7 +44,8 @@
 #include <strings.h>
 #include <unistd.h>
 
-#include "lo/lo.h"
+#include <X11/Xlib.h>
+#include <lo/lo.h>
 
 CompDisplay *firstDisplay;
 static int displayPrivateIndex;
@@ -52,7 +53,7 @@ static int corePrivateIndex;
 
 typedef struct
 {
-    int id;
+    int id,wid,cwid;
     float x, y, xmot,ymot, mot_accel,width,height;
 } command;
 
@@ -71,9 +72,7 @@ typedef struct _MultitouchDisplay
     Bool endThread;
     Bool tuioenabled;
 
-    int tuio_ptr;
     command blob[MAXBLOBS];
-
     CompTimeoutHandle timeoutHandles;
 } MultitouchDisplay;
 
@@ -104,15 +103,7 @@ MultitouchDisplay *md = GET_MULTITOUCH_DISPLAY (d)
 #define MULTITOUCH_SCREEN(s) \
 MultitouchScreen *ms = GET_MULTITOUCH_SCREEN (s, GET_MULTITOUCH_DISPLAY (s->display))
 
-typedef enum
-{
-    ActionUnknown = 0,
-    ActionAnnotate = 1,
-    ActionRipple = 2,
-    ActionText = 3
-}TouchAction;
-
-/* TODO: Add raw tuio protocol parsing, toggling the effects trough key/gestures
+/* TODO: Add toggling the effects trough key/gestures
 	draw debug info on cairo, animated effect for each blob, pie (radial) menu
 
 multitouchInitiate (CompDisplay     *d,
@@ -141,6 +132,69 @@ multitouchSendInfo (CompDisplay     *d,
 {
 }
 */
+
+/*
+ * get the topmost xlib window id from x,y coordinates
+ * name: pointer2wid
+ * @param pointx,pointy
+ * @return wid
+ */
+
+static int pointer2wid( int pointx, int pointy)
+{
+// To do this properly, we need to open another client connection to xlib
+// to prevent accidentall locks and segfaults as this is threaded call
+    char *display_name;
+    Display *d;
+    if ( (display_name = getenv("DISPLAY")) == (void *)NULL)
+    {
+        compLogMessage (firstDisplay, "multitouch", CompLogLevelError,
+                        "Error: DISPLAY environment variable not set!");
+        return 0;
+    }
+    if ((d = XOpenDisplay(display_name)) == NULL)
+    {
+        compLogMessage (firstDisplay, "multitouch", CompLogLevelError,
+                        "Error: Can't open display: %s!", display_name);
+        return 0;
+    }
+    unsigned int j, nwins;
+    int tx, ty,wid;
+    Window root_return, parent_return, *wins;
+    XWindowAttributes winattr;
+    Window root = currentRoot;
+    XQueryTree(d , root, &root_return, &parent_return, &wins, &nwins);
+    for (j = 1; j < nwins; j++)
+    {
+        XGetWindowAttributes(d , wins[j], &winattr);
+        if (!winattr.override_redirect && winattr.map_state == IsViewable)
+        {
+            if (wins[j]==winattr.root)
+            {
+                tx = 0;
+                ty = 0;
+            }
+            else
+            {
+                Window child_return;
+                XTranslateCoordinates(d, root, winattr.root,
+                                      winattr.x, winattr.y, &tx, &ty, &child_return);
+                if ( ( tx < pointx ) && ( ty < pointy ) && ( ( winattr.width + tx ) > pointx ) && ( ( winattr.height + ty ) > pointy ) )
+                    wid = wins[j] ;
+            }
+        }
+    }
+    XFree(wins);
+    XCloseDisplay(d);
+    if (wid)
+    {
+        CompWindow *cwin;
+        cwin = findWindowAtDisplay (firstDisplay, wid);
+        // In case this is dock (panel) window return 0
+        if (cwin->type & CompWindowTypeDockMask ) return 0;
+    }
+    return wid;
+}
 
 // Function to send commands to other plugins
 static Bool
@@ -216,6 +270,8 @@ makeripple (void *data)
     DisplayValue *dv = (DisplayValue *) data;
     CompScreen *s;
     s = findScreenAtDisplay (dv->display, currentRoot);
+    int width = s->width;
+    int height = s->height;
 
     CompOption arg[6];
     int nArg = 0;
@@ -227,22 +283,22 @@ makeripple (void *data)
 
     arg[nArg].name = "x0";
     arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = dv->x0;
+    arg[nArg].value.i = (dv->x0 * width);
     nArg++;
 
     arg[nArg].name = "y0";
     arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = dv->y0;
+    arg[nArg].value.i = (dv->y0 * height);
     nArg++;
 
     arg[nArg].name = "x1";
     arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = dv->x1;
+    arg[nArg].value.i = (dv->x1 * width);
     nArg++;
 
     arg[nArg].name = "y1";
     arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = dv->y1;
+    arg[nArg].value.i = (dv->y1 * height);
     nArg++;
 
     arg[nArg].name = "amplitude";
@@ -263,7 +319,6 @@ makeannotate (void *data)
     s = findScreenAtDisplay (dv->display, currentRoot);
     int width = s->width;
     int height = s->height;
-//    printf("ANNOTATE, width %d, height %d, x0 %f\n",width,height,dv->x0);
 
     if (s)
     {
@@ -374,91 +429,91 @@ isMemberOfSet (int *Set, int size, int value)
 }
 
 static int tuio_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                        void *data, void *user_data)
+                        void *data, CompScreen *s)
 {
-//    MULTITOUCH_SCREEN (findScreenAtDisplay(firstDisplay,currentRoot));
     MULTITOUCH_DISPLAY (firstDisplay);
 
     command *blobs = md->blob;
-    int i,alive[MAXBLOBS];
+    int j,alive[MAXBLOBS];
     int found = 0;
-    static int slot = 0;
-
-//    if (lo_server_events_pending(ms->st))
-//      printf("Debug - there are queded messagess\n");
-    if ( !strcmp((char *) argv[0],"set"))
+    if ( !strcmp((char *) argv[0],"set") && argv[1]->i) //bypasing first blob (id 0) as it's giving me headache
     {
-//        printf("Set - id: %d,xpos %f,ypos %f,xmot %f,ymot %f, mot_accel %f\n",argv[1]->i,argv[2]->f,argv[3]->f,argv[4]->f,argv[5]->f, argv[6]->f);
-        for (i = 0; i < MAXBLOBS; i++)
+        for (j = 0; j < MAXBLOBS; j++)
         {
-// we are already in the list, su just update x,y (move handler)
-            if (blobs[i].id == argv[1]->i)
+// we are already in the list, so just update x,y (move handler)
+            if (blobs[j].id == argv[1]->i)
             {
                 DisplayValue *dv = malloc (sizeof (DisplayValue));
                 if (!dv)
                     return FALSE;
+                printf("move handler - blobID (i):%d\n",blobs[j].id);
                 dv->display = firstDisplay;
-                dv->x0 = blobs[i].x; // put old X coordinates
-                dv->y0 = blobs[i].y;
-                dv->x1 = argv[2]->f; // new X coordinates
+                dv->x0 = blobs[j].x; // put old X coordinates
+                dv->y0 = blobs[j].y;
+                dv->x1 = argv[2]->f; // new X coordinates makeannotate
                 dv->y1 = argv[3]->f;
-                md->timeoutHandles = compAddTimeout (0, makeannotate, dv);
-                blobs[i].x = argv[2]->f;
-                blobs[i].y = argv[3]->f;
+                md->timeoutHandles = compAddTimeout (0, makeripple, dv);
+                blobs[j].x = argv[2]->f;
+                blobs[j].y = argv[3]->f;
                 found = 1;
                 break;
             }
-            else
-                found = 0;
         } // for
-// do we have free slot and new blob?
-        if (slot && !found)
+// do we have free slot and new blob? (touch down handler)
+        if (!found)
         {
-            blobs[(slot -1)].id = argv[1]->i;
-            blobs[(slot -1)].x = argv[2]->f;
-            blobs[(slot -1)].y = argv[3]->f;
-            blobs[(slot -1)].xmot = argv[4]->f;
-            blobs[(slot -1)].ymot = argv[5]->f;
-            blobs[(slot -1)].mot_accel = argv[6]->f;
+            //int wid = pointer2wid((int) s->width * argv[2]->f,(int) s->height * argv[3]->f);
+            //printf ("wid:%d \n", wid);
+            int slot = -1;
+            for (j=0; j<MAXBLOBS;j++)
+            {
+                if (!blobs[j].id)
+                {
+                    slot = j;
+                    break;
+                }
+            }
+            printf("down handler: slot: %d blobID: %d\n",slot,argv[1]->i);
+            if (slot != -1)
+            {
+                blobs[j].id = argv[1]->i;
+                blobs[j].x = argv[2]->f;
+                blobs[j].y = argv[3]->f;
+                blobs[j].xmot = argv[4]->f;
+                blobs[j].ymot = argv[5]->f;
+                blobs[j].mot_accel = argv[6]->f;
+            }
         }
     }
     else if ( !strcmp((char *) argv[0],"alive"))
     {
-//        printf("Alive - ");
-        for (i=1;i<argc;i++)
+        for (j=1;j<argc;j++)
         {
-//            printf("blobID: %d ",argv[i]->i);
-            alive[i-1] = argv[i]->i;
+            alive[j] = argv[j]->i;
         }
-//        printf("\n");
-        for (i = 0; i < MAXBLOBS; i++)
+        for (j = 0; j < MAXBLOBS; j++)
         {
-            if (blobs[i].id)
+            if (blobs[j].id)
             {
-// check if we have blobs that alive packet doesn't have (deleted blob)
-                if (!(isMemberOfSet (alive, MAXBLOBS, blobs[i].id)))
+// check if we have blobs that alive packet doesn't have (touch up handler)
+                if (!(isMemberOfSet (alive, MAXBLOBS, blobs[j].id)))
                 {
-                    blobs[i].id = 0;
-                    blobs[i].x = 0;
-                    blobs[i].y = 0;
-// no slot allocated (we are 0th member)
-                    if (!slot)
-                        slot = i + 1;
+                    printf("up handler - blobID: %d\n",blobs[j].id);
+                    blobs[j].id = 0;
+                    blobs[j].x = 0;
+                    blobs[j].y = 0;
                     break;
                 }
             } // if
-// to avoid 0 triggering again this condition, add 1 to i
-            else if (!slot)
-                slot = i + 1;
         } // for
-
     }
     else
     {
-        for (i=0; i<argc; i++)   //not handled messagess
+        return 0;
+        for (j=0; j<argc; j++)   //not handled messagess
         {
-            printf("arg %d '%c' ", i, types[i]);
-            lo_arg_pp(types[i], argv[i]);
+            printf("arg %d '%c' ", j, types[j]);
+            lo_arg_pp(types[j], argv[j]);
             printf("\n");
         }
     }
@@ -620,7 +675,7 @@ multitouchThread (void *display)
                         "Error: shmctl(IPC_RMID) failed.");
         return FALSE;
     }                           //if
-    return (int) NULL;
+    return 0;
 }
 
 static Bool
@@ -634,7 +689,7 @@ multitouchInitThread (CompDisplay * d)
     pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
     status =
         pthread_create (&md->eventsThread, &attr, multitouchThread,
-                        (void *) d);
+                        (CompDisplay *) d);
     pthread_attr_destroy (&attr);
     if (status)
     {
@@ -675,14 +730,13 @@ multitouchInitScreen (CompPlugin * p, CompScreen * s)
     MultitouchScreen *ms;
     MULTITOUCH_DISPLAY (s->display);
     char port[6];
-    sprintf (port,"%d",multitouchGetPort (s->display));
-
+    sprintf (port,"%d",multitouchGetPort (s));
     ms = malloc (sizeof (MultitouchScreen));
     if (!ms)
         return FALSE;
     s->base.privates[md->screenPrivateIndex].ptr = ms;
     ms->st = lo_server_thread_new(port, error);
-    lo_server_thread_add_method(ms->st, NULL, NULL, tuio_handler, NULL);
+    lo_server_thread_add_method(ms->st, "/tuio/2Dcur", NULL, tuio_handler,(void *) s);
     lo_server_thread_start(ms->st);
 
     return TRUE;
@@ -702,7 +756,7 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
 {
 // Generate a Multitouch display
     MultitouchDisplay *md;
-//   int i;
+    int j;
     if (!checkPluginABI ("core", CORE_ABIVERSION))
         return FALSE;
     md = malloc (sizeof (MultitouchDisplay));
@@ -717,6 +771,12 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
         free (md);
         return FALSE;
     }
+
+    for (j=0;j<MAXBLOBS;j++)
+    {
+        md->blob[j].id = 0;
+    }
+
     md->tuioenabled = FALSE;
     md->eventsThread = 0;
     md->endThread = FALSE;
@@ -724,7 +784,7 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
 // Record the display
     d->base.privates[displayPrivateIndex].ptr = md;
 
-    multitouchSetToggleTuioInitiate (d, multitouchToggle);
+//     multitouchSetToggleTuioInitiate (d, multitouchToggle);
 
     if (!multitouchInitThread (d))
     {
