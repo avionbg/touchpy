@@ -53,7 +53,7 @@ static int corePrivateIndex;
 
 typedef struct
 {
-    int id,wid,cwid;
+    int id,w;
     float x, y, xmot,ymot, mot_accel,width,height;
 } command;
 
@@ -456,11 +456,11 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
                 found = 1;
-                if ( blobs[j].wid )
+                if ( blobs[j].w )
                 {
                     int dx =  (dv->x1 - dv->x0) * s->width;
                     int dy =  (dv->y1 - dv->y0) * s->height;
-                    moveWindow((CompWindow * ) blobs[j].cwid, dx, dy, 1, 1);
+                    moveWindow((CompWindow * ) blobs[j].w, dx, dy, 1, 1);
                     //printf("movewindow id: %d, x%d , y:%d\n", blobs[j].wid, dx,dy );
                 }
                 break;
@@ -491,10 +491,9 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 blobs[j].mot_accel = argv[6]->f;
                 if (wid)
                 {
-                    blobs[j].wid = wid;
-                    blobs[j].cwid = (int) findWindowAtDisplay (firstDisplay, wid);
-                    CompWindow * cxid = (CompWindow *) blobs[j].cwid;
-                    windowGrabNotify(cxid,(int) blobs[j].x * s->width ,(int) blobs[j].y * s->height,cxid->state ,CompWindowGrabButtonMask);
+                    CompWindow * w = (CompWindow *) findWindowAtDisplay (firstDisplay, wid);
+                    blobs[j].w = (int) w;
+                    (*w->screen->windowGrabNotify)(w,(int) blobs[j].x * s->width ,(int) blobs[j].y * s->height,w->state ,CompWindowGrabButtonMask);
                 }
             }
         }
@@ -512,17 +511,16 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
 // check if we have blobs that alive packet doesn't have (touch up handler)
                 if (!(isMemberOfSet (alive, MAXBLOBS, blobs[j].id)))
                 {
-                    if (blobs[j].cwid)
+                    if (blobs[j].w)
                         {
-                        windowUngrabNotify((CompWindow * ) blobs[j].cwid);
-                        syncWindowPosition((CompWindow * ) blobs[j].cwid);
+                        s->windowUngrabNotify((CompWindow * ) blobs[j].w);
+                        syncWindowPosition((CompWindow * ) blobs[j].w);
                         }
                     printf("up handler - blobID: %d\n",blobs[j].id);
                     blobs[j].id = 0;
                     blobs[j].x = 0;
                     blobs[j].y = 0;
-                    blobs[j].wid = 0;
-                    blobs[j].cwid = 0;
+                    blobs[j].w = 0;
                     break;
                 }
             } // if
@@ -796,8 +794,7 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
     for (j=0;j<MAXBLOBS;j++)
     {
         md->blob[j].id = 0;
-        md->blob[j].wid = 0;
-        md->blob[j].cwid = 0;
+        md->blob[j].w = 0;
     }
 
     md->tuioenabled = FALSE;
