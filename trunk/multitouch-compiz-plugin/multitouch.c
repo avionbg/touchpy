@@ -23,7 +23,6 @@
  * Boston, MA  02110-1301, USA.
  */
 
-#define KEY (1972)
 #define MAXBLOBS (20)
 
 #include <compiz-core.h>
@@ -33,12 +32,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <sys/sem.h>
-#include <pthread.h>
 
 #include <sys/time.h>
 #include <strings.h>
@@ -54,7 +47,7 @@ static int corePrivateIndex;
 typedef struct
 {
     int id,w;
-    float x, y, xmot,ymot, mot_accel,width,height;
+    float x, y, xmot,ymot, mot_accel,width,height,oldx,oldy;
 } command;
 
 typedef struct
@@ -427,6 +420,18 @@ isMemberOfSet (int *Set, int size, int value)
     }
     return 0;
 }
+static int command_handler(const char *path, const char *types, lo_arg **argv, int argc,
+                        void *data, CompScreen *s)
+{
+    int j;
+    for (j=0; j<argc; j++)   //not handled messagess
+        {
+            printf("arg %d '%c' ", j, types[j]);
+            lo_arg_pp(types[j], argv[j]);
+            printf("\n");
+        }
+    return 0;
+}
 
 static int tuio_handler(const char *path, const char *types, lo_arg **argv, int argc,
                         void *data, CompScreen *s)
@@ -434,7 +439,7 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
     MULTITOUCH_DISPLAY (s->display);
 
     command *blobs = md->blob;
-    int j,alive[MAXBLOBS];
+    int j,k,multiblobs,alive[MAXBLOBS];
     int found = 0;
     if ( !strcmp((char *) argv[0],"set") && argv[1]->i) //bypasing first blob (id 0) as it's giving me headache
     {
@@ -455,14 +460,35 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 md->timeoutHandles = compAddTimeout (0, makeripple, dv);
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
+                blobs[j].oldx = dv->x0;
+                blobs[j].oldy = dv->y0;
                 found = 1;
                 if ( blobs[j].w )
                 {
-                    int dx =  (dv->x1 - dv->x0) * s->width;
-                    int dy =  (dv->y1 - dv->y0) * s->height;
-                    CompWindow *  w = (void *) blobs[j].w;
-                    moveWindow(w, dx, dy, TRUE, FALSE);
-                    //printf("movewindow id: %d, x%d , y:%d\n", blobs[j].wid, dx,dy );
+                    for (k=0;k<MAXBLOBS; k++)
+                        {
+                            multiblobs = FALSE;
+                            if ( k != j && blobs[k].w ) // We have multiple blobs per window
+                                {
+                                    multiblobs = k;
+                                    break;
+                                }
+                        }
+                    if (multiblobs && blobs[multiblobs].oldx)
+                        {
+                        int dx0 = (dv->x1 - dv->x0) * s->width;
+                        int dy0 = (dv->y1 - dv->y0) * s->height;
+                        //int dx1 =
+                        //int dy1 =
+                        }
+                    else // Single blob, do just the movement
+                        {
+                        int dx = (dv->x1 - dv->x0) * s->width;
+                        int dy = (dv->y1 - dv->y0) * s->height;
+                        CompWindow *  w = (void *) blobs[j].w;
+                        moveWindow(w, dx, dy, TRUE, FALSE);
+                        //printf("movewindow id: %d, x%d , y:%d\n", blobs[j].wid, dx,dy );
+                        }
                 }
                 break;
             } // if
@@ -482,7 +508,9 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
             //printf("down handler: slot: %d blobID: %d\n",slot,argv[1]->i);
             if (slot != -1)
             {
-                int wid = point2wid((int) s->width * argv[2]->f,(int) s->height * argv[3]->f);
+                // enable/disable under to have windows movement
+                //int wid = point2wid((int) s->width * argv[2]->f,(int) s->height * argv[3]->f);
+                int wid = 0;
                 //printf ("wid:%d \n", wid);
                 blobs[j].id = argv[1]->i;
                 blobs[j].x = argv[2]->f;
@@ -494,7 +522,6 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 {
                     CompWindow * w = (CompWindow *) findWindowAtDisplay (s->display, wid);
                     blobs[j].w = (int) w;
-                    //(*w->screen->windowGrabNotify)(w,(int) blobs[j].x * s->width ,(int) blobs[j].y * s->height,w->state ,CompWindowGrabButtonMask);
                     (*w->screen->windowGrabNotify)(w,w->attrib.x + (w->width / 2),w->attrib.y + (w->height / 2),0 ,CompWindowGrabMoveMask | CompWindowGrabButtonMask);
                 }
             } // if
@@ -548,180 +575,6 @@ static void error(int num, const char *msg, const char *path)
                     "liblo server error %d in path %s: %s", num, path, msg);
 }
 
-// Thread which is used to read commands sent over
-// shared memory and trigger the main thread trough timeouts
-static Bool
-multitouchThread (void *display)
-{
-    CompDisplay *d = (CompDisplay *) display;
-    MULTITOUCH_DISPLAY (d);
-    int shmid, semid, retval, i;
-    tuio *tcomm;
-    command *tuio_cmd;
-    command *blobs = md->blob;
-//  command blob[MAXBLOBS] = { (int) NULL, (int) NULL, (int) NULL };
-    struct sembuf operations[1];
-    union semun
-    {
-        int val;
-        struct semid_ds *buf;
-        ushort *array;
-    } argument;
-    argument.val = 0;
-// Shared memory init
-    shmid = shmget (KEY, sizeof (*tcomm), 0666 | IPC_CREAT);
-    if (shmid == -1)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Error in allocating shm (error code: %d).", shmid);
-        return FALSE;
-    }                           //if
-    tcomm = shmat (shmid, NULL, 0);
-    if (tcomm == (void *) -1)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Error attaching memory(error code: %d).", tcomm);
-        return FALSE;
-    }                           //if
-
-// Semaphore init
-    semid = semget (KEY, 1, 0666 | IPC_CREAT);
-    if (semid < 0)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Cannot find semaphore, exiting.(error code: %d).",
-                        semid);
-        return FALSE;
-    }
-    if (semctl (semid, 0, SETVAL, argument) < 0)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Cannot set semaphore value.");
-        return FALSE;
-    }
-// Thread loop
-    while (1)
-    {
-        operations[0].sem_num = 0;
-        operations[0].sem_op = -1;
-        operations[0].sem_flg = 0;
-        retval = semop (semid, operations, 1);
-//       md->tuio_ptr = tcomm;
-// Lock the mutex
-        pthread_mutex_lock (&md->lock);
-// Check If we have end flag set
-        if (md->endThread)
-        {
-// We have end flag set, exit from loop and join with main thread
-            pthread_mutex_unlock (&md->lock);
-            break;
-        }
-// Unlock the mutex
-        pthread_mutex_unlock (&md->lock);
-// Continue with standard processing
-        tuio_cmd = &(tcomm->comm);
-        int found = 0;
-        int slot = 0;
-        for (i = 0; i < MAXBLOBS; i++)
-        {
-            if (blobs[i].id)
-            {
-// check if we have blobs that alive packet doesn't have (deleted blob)
-                if (!(isMemberOfSet (tcomm->alive, MAXBLOBS, blobs[i].id)))
-                {
-                    blobs[i].id = 0;
-                    blobs[i].x = 0;
-                    blobs[i].y = 0;
-// no slot allocated (we are 0th member)
-                    if (!slot)
-                        slot = i + 1;
-                    break;
-                }
-            } // if
-// to avoid 0 triggering again this condition, add 1 to i
-            else if (!slot)
-                slot = i + 1;
-        } // for
-
-        for (i = 0; i < MAXBLOBS; i++)
-        {
-// we are already in the list, su just update x,y
-            if (blobs[i].id == tuio_cmd->id)
-            {
-                DisplayValue *dv = malloc (sizeof (DisplayValue));
-                if (!dv)
-                    return FALSE;
-                dv->display = d;
-                dv->x0 = blobs[i].x;
-                dv->y0 = blobs[i].y;
-                dv->x1 = tuio_cmd->x;
-                dv->y1 = tuio_cmd->y;
-                md->timeoutHandles = compAddTimeout (0, makeannotate, dv);
-                blobs[i].x = tuio_cmd->x;
-                blobs[i].y = tuio_cmd->y;
-                found = 1;
-                break;
-            }
-            else
-                found = 0;
-        } // for
-
-// do we have free slot and new blob?
-        if (slot && !found)
-        {
-            memcpy (&(blobs[(slot - 1)]), tuio_cmd, sizeof (*tuio_cmd));   // copy the blob into slot position
-        }
-
-
-        operations[0].sem_num = 0;
-        operations[0].sem_op = -1;
-        operations[0].sem_flg = 0;
-        retval = semop (semid, operations, 1);
-    }
-
-    if (semctl (semid, 0, IPC_RMID, 0) < 0)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Cannot delete semaphore.");
-        return FALSE;
-    }
-    if (shmdt (tcomm) == -1)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Error detaching shared memory.");
-        return FALSE;
-    }                           //if
-    if (shmctl (shmid, IPC_RMID, 0) == -1)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Error: shmctl(IPC_RMID) failed.");
-        return FALSE;
-    }                           //if
-    return 0;
-}
-
-static Bool
-multitouchInitThread (CompDisplay * d)
-{
-    int status;
-    MULTITOUCH_DISPLAY (d);
-
-    pthread_attr_t attr;
-    pthread_attr_init (&attr);
-    pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
-    status =
-        pthread_create (&md->eventsThread, &attr, multitouchThread,
-                        (CompDisplay *) d);
-    pthread_attr_destroy (&attr);
-    if (status)
-    {
-        compLogMessage (d, "multitouch", CompLogLevelFatal,
-                        "Could not start thread (error code: %d).", status);
-        return FALSE;
-    }
-    return TRUE;
-}
-
 // Plugin Core Initialization
 static Bool
 multitouchInitCore (CompPlugin * p, CompCore * c)
@@ -759,6 +612,7 @@ multitouchInitScreen (CompPlugin * p, CompScreen * s)
     s->base.privates[md->screenPrivateIndex].ptr = ms;
     ms->st = lo_server_thread_new(port, error);
     lo_server_thread_add_method(ms->st, "/tuio/2Dcur", NULL, tuio_handler,(void *) s);
+    lo_server_thread_add_method(ms->st, "/command", NULL, command_handler,(void *) s);
     lo_server_thread_start(ms->st);
 
     return TRUE;
@@ -801,68 +655,16 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
     }
 
     md->tuioenabled = FALSE;
-    md->eventsThread = 0;
-    md->endThread = FALSE;
-    pthread_mutex_init (&md->lock, NULL);
 // Record the display
     d->base.privates[displayPrivateIndex].ptr = md;
-
 //     multitouchSetToggleTuioInitiate (d, multitouchToggle);
-
-    if (!multitouchInitThread (d))
-    {
-        pthread_mutex_destroy (&md->lock);
-        free (md);
-    }
     return TRUE;
 }
 
 static void
 multitouchFiniDisplay (CompPlugin * p, CompDisplay * d)
 {
-    int status, id;               //, retval, i;
     MULTITOUCH_DISPLAY (d);
-    union semun
-    {
-        int val;
-        struct semid_ds *buf;
-        ushort *array;
-    } argument;
-    argument.val = 2;
-// If thread is still there (the opposite would be seriously worrying),
-// lock the mutex, set termination flag, unlock the mutex and wait for
-// the thread.
-    if (md->eventsThread)
-    {
-        pthread_mutex_lock (&md->lock);
-
-        md->endThread = TRUE;
-        if (!md->tuioenabled)
-        {
-// Prepairing the thread, unpause the semaphore in case it's waiting
-            id = semget (KEY, 1, 0666);
-            if (id < 0)
-            {
-                compLogMessage (d, "multitouch", CompLogLevelError,
-                                "Error: Cannot find semaphore on FiniDisplay (error code : %d).",
-                                id);
-            }
-            if (semctl (id, 0, SETVAL, argument) < 0)
-            {
-                compLogMessage (d, "multitouch", CompLogLevelFatal,
-                                "In multitouchFiniDisplay Cannot set semaphore value.");
-//        return FALSE;
-            }
-// Now unlock the mutex and wait for child thread to join
-        }
-        pthread_mutex_unlock (&md->lock);
-        status = pthread_join (md->eventsThread, NULL);
-        if (status)
-            compLogMessage (d, "multitouch", CompLogLevelError,
-                            "pthread_join () failed (error code : %d).",
-                            status);
-    }
-    pthread_mutex_destroy (&md->lock);
 // Free the private index
     freeScreenPrivateIndex (d, md->screenPrivateIndex);
 // Free the pointer
