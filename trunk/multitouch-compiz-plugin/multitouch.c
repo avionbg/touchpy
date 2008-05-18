@@ -431,7 +431,7 @@ isMemberOfSet (int *Set, int size, int value)
 static int tuio_handler(const char *path, const char *types, lo_arg **argv, int argc,
                         void *data, CompScreen *s)
 {
-    MULTITOUCH_DISPLAY (firstDisplay);
+    MULTITOUCH_DISPLAY (s->display);
 
     command *blobs = md->blob;
     int j,alive[MAXBLOBS];
@@ -446,8 +446,8 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 DisplayValue *dv = malloc (sizeof (DisplayValue));
                 if (!dv)
                     return FALSE;
-                printf("move handler - blobID (i):%d\n",blobs[j].id);
-                dv->display = firstDisplay;
+                //printf("move handler - blobID (i):%d\n",blobs[j].id);
+                dv->display = s->display;
                 dv->x0 = blobs[j].x; // put old X coordinates
                 dv->y0 = blobs[j].y;
                 dv->x1 = argv[2]->f; // new X coordinates makeannotate
@@ -460,11 +460,12 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 {
                     int dx =  (dv->x1 - dv->x0) * s->width;
                     int dy =  (dv->y1 - dv->y0) * s->height;
-                    moveWindow((CompWindow * ) blobs[j].w, dx, dy, 1, 1);
+                    CompWindow *  w = (void *) blobs[j].w;
+                    moveWindow(w, dx, dy, TRUE, FALSE);
                     //printf("movewindow id: %d, x%d , y:%d\n", blobs[j].wid, dx,dy );
                 }
                 break;
-            }
+            } // if
         } // for
 // do we have new blob? (touch down handler)
         if (!found)
@@ -478,7 +479,7 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                     break;
                 }
             }
-            printf("down handler: slot: %d blobID: %d\n",slot,argv[1]->i);
+            //printf("down handler: slot: %d blobID: %d\n",slot,argv[1]->i);
             if (slot != -1)
             {
                 int wid = point2wid((int) s->width * argv[2]->f,(int) s->height * argv[3]->f);
@@ -491,13 +492,14 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 blobs[j].mot_accel = argv[6]->f;
                 if (wid)
                 {
-                    CompWindow * w = (CompWindow *) findWindowAtDisplay (firstDisplay, wid);
+                    CompWindow * w = (CompWindow *) findWindowAtDisplay (s->display, wid);
                     blobs[j].w = (int) w;
-                    (*w->screen->windowGrabNotify)(w,(int) blobs[j].x * s->width ,(int) blobs[j].y * s->height,w->state ,CompWindowGrabButtonMask);
+                    //(*w->screen->windowGrabNotify)(w,(int) blobs[j].x * s->width ,(int) blobs[j].y * s->height,w->state ,CompWindowGrabButtonMask);
+                    (*w->screen->windowGrabNotify)(w,w->attrib.x + (w->width / 2),w->attrib.y + (w->height / 2),0 ,CompWindowGrabMoveMask | CompWindowGrabButtonMask);
                 }
-            }
-        }
-    }
+            } // if
+        } // if
+    } // if
     else if ( !strcmp((char *) argv[0],"alive"))
     {
         for (j=1;j<argc;j++)
@@ -513,10 +515,11 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 {
                     if (blobs[j].w)
                         {
-                        s->windowUngrabNotify((CompWindow * ) blobs[j].w);
-                        syncWindowPosition((CompWindow * ) blobs[j].w);
+                        CompWindow * w = (void *) blobs[j].w;
+                        (*w->screen->windowUngrabNotify)(w);
+                        syncWindowPosition(w);
                         }
-                    printf("up handler - blobID: %d\n",blobs[j].id);
+                    //printf("up handler - blobID: %d\n",blobs[j].id);
                     blobs[j].id = 0;
                     blobs[j].x = 0;
                     blobs[j].y = 0;
