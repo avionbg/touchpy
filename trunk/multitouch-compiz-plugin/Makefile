@@ -32,7 +32,7 @@
 ECHO	  = `which echo`
 
 # default color settings
-color := $(shell if [ $$TERM = "dumb" ]; then $(ECHO) "no"; else $(ECHO) "yes"; fi)
+color := $(shell if [ $$TERM == "dumb" ]; then $(ECHO) "no"; else $(ECHO) "yes"; fi)
 
 ifeq ($(shell if [ -f plugin.info ]; then $(ECHO) -n "found"; fi ),found)
 include plugin.info
