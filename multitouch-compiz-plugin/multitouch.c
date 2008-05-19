@@ -44,40 +44,42 @@ CompDisplay *firstDisplay;
 static int displayPrivateIndex;
 static int corePrivateIndex;
 
+typedef enum
+{
+    ActionAnnotate = 1,
+    ActionRipple = 2
+}TouchAction;
+
 typedef struct
 {
     int id,w;
     float x, y, xmot,ymot, mot_accel,width,height,oldx,oldy;
-} command;
+} mtblob;
 
 typedef struct
 {
-    command comm;
-    int alive[MAXBLOBS];
-} tuio;
+    unsigned short R,G,B,A;
+} mtcolor;
 
 typedef struct _MultitouchDisplay
 {
     int screenPrivateIndex;
-
-    pthread_t eventsThread;
-    pthread_mutex_t lock;
-    Bool endThread;
-    Bool tuioenabled;
-
-    command blob[MAXBLOBS];
+    Bool TuioFwdEnabled;
+    mtblob blob[MAXBLOBS];
     CompTimeoutHandle timeoutHandles;
 } MultitouchDisplay;
 
 typedef struct _MultitouchScreen
 {
     int windowPrivateIndex;
-    Bool title;
     lo_server_thread st;
+    Bool movewins;
+    float line_width;
+    TouchAction CurrentEffect;
+    mtcolor color;
 } MultitouchScreen;
 
-
-// This struct is used as closure for timeouts
+/* This struct is used as closure for timeouts */
 typedef struct _DisplayValue
 {
     CompDisplay *display;
@@ -97,34 +99,8 @@ MultitouchDisplay *md = GET_MULTITOUCH_DISPLAY (d)
 MultitouchScreen *ms = GET_MULTITOUCH_SCREEN (s, GET_MULTITOUCH_DISPLAY (s->display))
 
 /* TODO: Add toggling the effects trough key/gestures
-	draw debug info on cairo, animated effect for each blob, pie (radial) menu
-
-multitouchInitiate (CompDisplay     *d,
-		 CompAction      *action,
-		 CompActionState cstate,
-		 CompOption      *option,
-		 int             nOption)
-{
-}
-
-Bool
-multitouchTerminate (CompDisplay     *d,
-		 CompAction      *action,
-		 CompActionState cstate,
-		 CompOption      *option,
-		 int             nOption)
-{
-}
-
-Bool
-multitouchSendInfo (CompDisplay     *d,
-		 CompAction      *action,
-		 CompActionState cstate,
-		 CompOption      *option,
-		 int             nOption)
-{
-}
-*/
+ * draw debug info on cairo, animated effect for each blob, pie (radial) menu
+ */
 
 /*
  * get the topmost xlib window id from x,y coordinates
@@ -135,8 +111,10 @@ multitouchSendInfo (CompDisplay     *d,
 
 static int point2wid( int pointx, int pointy)
 {
-// To do this properly, we need to open another client connection to xlib
-// to prevent accidentall locks and segfaults as this is threaded call
+/*
+ * To do this properly, we need to open another client connection to X
+ * to prevent accidentall locks and segfaults as this is threaded call
+ */
     char *display_name;
     Display *d;
     if ( (display_name = getenv("DISPLAY")) == (void *)NULL)
@@ -189,7 +167,13 @@ static int point2wid( int pointx, int pointy)
     return wid;
 }
 
-// Function to send commands to other plugins
+/*
+ * Send commands trough action system of the compiz to other plugins
+ * name: sendInfoToPlugin
+ * @param display, argument, nArgument, pluginName, actionName
+ * @return bool
+ */
+
 static Bool
 sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
                   char *pluginName, char *actionName)
@@ -212,15 +196,12 @@ sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
                         "Reporting plugin '%s' does not exist!", pluginName);
         return FALSE;
     }
-
     if (p && p->vTable->getObjectOptions)
     {
         options = (*p->vTable->getObjectOptions) (p, o, &nOptions);
         option = compFindOption (options, nOptions, actionName, 0);
         pluginExists = TRUE;
-
     }
-
     if (pluginExists)
     {
         if (option && option->value.action.initiate)
@@ -232,14 +213,12 @@ sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
         }
         else
         {
-
             compLogMessage (d, "multitouch", CompLogLevelError,
                             "Plugin '%s' does exist, but no option named '%s' was found!",
                             pluginName, actionName);
             return FALSE;
         }
     }
-
     return TRUE;
 }
 
@@ -248,57 +227,58 @@ multitouchToggle (CompDisplay * d,
                   CompAction * action,
                   CompActionState state, CompOption * option, int nOption)
 {
-
     MULTITOUCH_DISPLAY (d);
-
-    md->tuioenabled = !md->tuioenabled;
-
+    md->TuioFwdEnabled = !md->TuioFwdEnabled;
     return FALSE;
 }
 
-// Calls to other plugins
+/* Calls to other plugins */
+
 static Bool
 makeripple (void *data)
 {
     DisplayValue *dv = (DisplayValue *) data;
     CompScreen *s;
-    s = findScreenAtDisplay (dv->display, currentRoot);
-    int width = s->width;
-    int height = s->height;
-
     CompOption arg[6];
-    int nArg = 0;
+    s = findScreenAtDisplay (dv->display, currentRoot);
 
-    arg[nArg].name = "root";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = s->root;
-    nArg++;
+    if (s)
+    {
+        int width = s->width;
+        int height = s->height;
+        int nArg = 0;
 
-    arg[nArg].name = "x0";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = (dv->x0 * width);
-    nArg++;
+        arg[nArg].name = "root";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = s->root;
+        nArg++;
 
-    arg[nArg].name = "y0";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = (dv->y0 * height);
-    nArg++;
+        arg[nArg].name = "x0";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = (dv->x0 * width);
+        nArg++;
 
-    arg[nArg].name = "x1";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = (dv->x1 * width);
-    nArg++;
+        arg[nArg].name = "y0";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = (dv->y0 * height);
+        nArg++;
 
-    arg[nArg].name = "y1";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = (dv->y1 * height);
-    nArg++;
+        arg[nArg].name = "x1";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = (dv->x1 * width);
+        nArg++;
 
-    arg[nArg].name = "amplitude";
-    arg[nArg].type = CompOptionTypeFloat;
-    arg[nArg].value.i = 0.5f;     // 0.25f za point,0.5f za line
+        arg[nArg].name = "y1";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = (dv->y1 * height);
+        nArg++;
 
-    sendInfoToPlugin (dv->display, arg, nArg, "water", "line");
+        arg[nArg].name = "amplitude";
+        arg[nArg].type = CompOptionTypeFloat;
+        arg[nArg].value.i = 0.5f;     // 0.25f 4 point,0.5f 4 line
+
+        sendInfoToPlugin (dv->display, arg, nArg, "water", "line");
+    }
     free (dv);
     return FALSE;                 // Return False so the timeout gets removed upon first callback
 }
@@ -306,16 +286,16 @@ makeripple (void *data)
 static Bool
 makeannotate (void *data)
 {
-
     DisplayValue *dv = (DisplayValue *) data;
     CompScreen *s;
     s = findScreenAtDisplay (dv->display, currentRoot);
+    MULTITOUCH_SCREEN(s);
     int width = s->width;
     int height = s->height;
 
     if (s)
     {
-        CompOption arg[7];
+        CompOption arg[8];
         int nArg = 0;
 
         arg[nArg].name = "root";
@@ -348,19 +328,14 @@ makeannotate (void *data)
         arg[nArg].value.f = (float) (dv->y1 * height);
         nArg++;
 
-// TODO: Check what's the format of ComOptionTypeColor
-// for black it would be something like
-// int i; for (i = 0; i < 3 i++){ c[i] = 0; } c[3] = 255;
-// CompOptionTypeColor c;
-// unsigned short c[3];
-// // c[0] = 0;
-// // c[1] = 0;
-// // c[2] = 0;
-// // c[3] = 255;
-// int i; for (i = 0; i < 3; i++){ c[i] = 0; } c[3] = 255;
-//   arg[nArg].name = "fill_color";
-//   arg[nArg].type = CompOptionTypeColor;
-//   arg[nArg].value.c = c;
+        mtcolor color = ms->color;
+        arg[nArg].name = "fill_color";
+        arg[nArg].type = CompOptionTypeColor;
+        arg[nArg].value.c[0]=color.R;
+        arg[nArg].value.c[1]=color.G;
+        arg[nArg].value.c[2]=color.B;
+        arg[nArg].value.c[3]=color.A;
+        nArg++;
 
         arg[nArg].name = "line_width";
         arg[nArg].type = CompOptionTypeFloat;
@@ -369,44 +344,53 @@ makeannotate (void *data)
         sendInfoToPlugin (dv->display, arg, nArg, "annotate", "draw");
     }
     free (dv);
-    return FALSE;                 // Return False so the timeout gets removed upon first callback
+    return FALSE;
 }
+
 
 static Bool
 displaytext (void *data)
 {
     DisplayValue *dv = (DisplayValue *) data;
     CompScreen *s;
-    s = findScreenAtDisplay (dv->display, currentRoot);
-
     CompOption arg[4];
     int nArg = 0;
+    s = findScreenAtDisplay (dv->display, currentRoot);
 
-    arg[nArg].name = "window";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = dv->display->activeWindow;
-    nArg++;
+    if (s)
+    {
+        arg[nArg].name = "window";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = dv->display->activeWindow;
+        nArg++;
 
-    arg[nArg].name = "root";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = s->root;
-    nArg++;
+        arg[nArg].name = "root";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = s->root;
+        nArg++;
 
-    arg[nArg].name = "string";
-    arg[nArg].type = CompOptionTypeString;
-    arg[nArg].value.s = "Multitouch initiated succesfully!";
-    nArg++;
+        arg[nArg].name = "string";
+        arg[nArg].type = CompOptionTypeString;
+        arg[nArg].value.s = "Multitouch initiated succesfully!";
+        nArg++;
 
-    arg[nArg].name = "timeout";
-    arg[nArg].type = CompOptionTypeInt;
-    arg[nArg].value.i = 2000;
+        arg[nArg].name = "timeout";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = 2000;
 
-    sendInfoToPlugin (dv->display, arg, nArg, "prompt", "display_text");
+        sendInfoToPlugin (dv->display, arg, nArg, "prompt", "display_text");
+    }
     free (dv);
-    return FALSE;                 // Return False so the timeout gets removed upon first callback
+    return FALSE;
 }
 
-// Check if a value is part of set
+/*
+ * Check if a value is part of set
+ * name: isMemberOfSet
+ * @param *Set, size, value
+ * @return bool
+ */
+
 static int
 isMemberOfSet (int *Set, int size, int value)
 {
@@ -420,15 +404,42 @@ isMemberOfSet (int *Set, int size, int value)
     }
     return 0;
 }
+
+/* Callback handlers */
+
+static void loerror(int num, const char *msg, const char *path)
+{
+    compLogMessage (firstDisplay, "multitouch", CompLogLevelFatal,
+                    "liblo server error %d in path %s: %s", num, path, msg);
+}
+
 static int command_handler(const char *path, const char *types, lo_arg **argv, int argc,
                         void *data, CompScreen *s)
 {
+    MULTITOUCH_SCREEN(s);
     int j;
-    for (j=0; j<argc; j++)   //not handled messagess
+    mtcolor color = ms->color;
+    for (j=0; j<argc; j++)
         {
+            if ( !strcmp((char *) argv[0],"color"))
+            {
+                color.R = argv[1]->i;
+                color.G = argv[2]->i;
+                color.B = argv[3]->i;
+                color.A = argv[4]->i;
+            }
+            else if ( !strcmp((char *) argv[0],"toggle"))
+            {
+                if ( ms->CurrentEffect == ActionAnnotate )
+                    ms->CurrentEffect = ActionRipple;
+                else ms->CurrentEffect = ActionAnnotate;
+            }
+            else
+            {
             printf("arg %d '%c' ", j, types[j]);
             lo_arg_pp(types[j], argv[j]);
             printf("\n");
+            }
         }
     return 0;
 }
@@ -437,15 +448,15 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                         void *data, CompScreen *s)
 {
     MULTITOUCH_DISPLAY (s->display);
-
-    command *blobs = md->blob;
+    MULTITOUCH_SCREEN (s);
+    mtblob *blobs = md->blob;
     int j,k,multiblobs,alive[MAXBLOBS];
     int found = 0;
     if ( !strcmp((char *) argv[0],"set") && argv[1]->i) //bypasing first blob (id 0) as it's giving me headache
     {
         for (j = 0; j < MAXBLOBS; j++)
         {
-// we are already in the list, so just update x,y (move handler)
+/* we are already in the list, so just update x,y (move handler) */
             if (blobs[j].id == argv[1]->i)
             {
                 DisplayValue *dv = malloc (sizeof (DisplayValue));
@@ -455,15 +466,15 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 dv->display = s->display;
                 dv->x0 = blobs[j].x; // put old X coordinates
                 dv->y0 = blobs[j].y;
-                dv->x1 = argv[2]->f; // new X coordinates makeannotate
+                dv->x1 = argv[2]->f; // new X coordinates  makeripple
                 dv->y1 = argv[3]->f;
-                md->timeoutHandles = compAddTimeout (0, makeripple, dv);
+                md->timeoutHandles = compAddTimeout (0,makeannotate, dv);
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
-                blobs[j].oldx = dv->x0;
+                blobs[j].oldx = dv->x0; // store old X in blobs[] also
                 blobs[j].oldy = dv->y0;
                 found = 1;
-                if ( blobs[j].w )
+                if ( blobs[j].w ) // We have window id attached to blob
                 {
                     for (k=0;k<MAXBLOBS; k++)
                         {
@@ -476,10 +487,10 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                         }
                     if (multiblobs && blobs[multiblobs].oldx)
                         {
-                        int dx0 = (dv->x1 - dv->x0) * s->width;
-                        int dy0 = (dv->y1 - dv->y0) * s->height;
-                        //int dx1 =
-                        //int dy1 =
+                        CompWindow *  w = (void *) blobs[j].w;
+                        int dx = (dv->x1 - dv->x0) * s->width;
+                        int dy = (dv->y1 - dv->y0) * s->height;
+                        resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
                         }
                     else // Single blob, do just the movement
                         {
@@ -493,7 +504,7 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 break;
             } // if
         } // for
-// do we have new blob? (touch down handler)
+/* do we have new blob? (touch down handler) */
         if (!found)
         {
             int slot = -1;
@@ -522,7 +533,8 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
                 {
                     CompWindow * w = (CompWindow *) findWindowAtDisplay (s->display, wid);
                     blobs[j].w = (int) w;
-                    (*w->screen->windowGrabNotify)(w,w->attrib.x + (w->width / 2),w->attrib.y + (w->height / 2),0 ,CompWindowGrabMoveMask | CompWindowGrabButtonMask);
+                    (*w->screen->windowGrabNotify)(w,w->attrib.x + (w->width / 2),w->attrib.y + (w->height / 2),
+                                                    0 ,CompWindowGrabMoveMask | CompWindowGrabButtonMask);
                 }
             } // if
         } // if
@@ -537,7 +549,7 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
         {
             if (blobs[j].id)
             {
-// check if we have blobs that alive packet doesn't have (touch up handler)
+/* check if we have blobs that alive packet doesn't have (touch up handler) */
                 if (!(isMemberOfSet (alive, MAXBLOBS, blobs[j].id)))
                 {
                     if (blobs[j].w)
@@ -569,27 +581,17 @@ static int tuio_handler(const char *path, const char *types, lo_arg **argv, int 
     return 0;
 }
 
-static void error(int num, const char *msg, const char *path)
-{
-    compLogMessage (firstDisplay, "multitouch", CompLogLevelFatal,
-                    "liblo server error %d in path %s: %s", num, path, msg);
-}
+/* Plugin Initialization */
 
-// Plugin Core Initialization
 static Bool
 multitouchInitCore (CompPlugin * p, CompCore * c)
 {
     if (!checkPluginABI ("core", CORE_ABIVERSION))
         return FALSE;
-
     displayPrivateIndex = allocateDisplayPrivateIndex ();
     if (displayPrivateIndex < 0)
-    {
         return FALSE;
-    }
-
     firstDisplay = c->displays; // Use initCore() to find the first display (c->displays)
-
     return TRUE;
 }
 
@@ -610,7 +612,11 @@ multitouchInitScreen (CompPlugin * p, CompScreen * s)
     if (!ms)
         return FALSE;
     s->base.privates[md->screenPrivateIndex].ptr = ms;
-    ms->st = lo_server_thread_new(port, error);
+    ms->color.R = 0x0;
+    ms->color.G = 0x0;
+    ms->color.B = 0x0;
+    ms->color.A = 0xffff;
+    ms->st = lo_server_thread_new(port, loerror);
     lo_server_thread_add_method(ms->st, "/tuio/2Dcur", NULL, tuio_handler,(void *) s);
     lo_server_thread_add_method(ms->st, "/command", NULL, command_handler,(void *) s);
     lo_server_thread_start(ms->st);
@@ -623,14 +629,13 @@ multitouchFiniScreen (CompPlugin * p, CompScreen * s)
 {
     MULTITOUCH_SCREEN (s);
     lo_server_thread_free(ms->st);
-
     free (ms);
 }
 
 static Bool
 multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
 {
-// Generate a Multitouch display
+/* Generate a Multitouch display */
     MultitouchDisplay *md;
     int j;
     if (!checkPluginABI ("core", CORE_ABIVERSION))
@@ -638,12 +643,12 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
     md = malloc (sizeof (MultitouchDisplay));
     if (!md)
         return FALSE;
-// Allocate a private index
+/* Allocate a private index */
     md->screenPrivateIndex = allocateScreenPrivateIndex (d);
-// Check if its valid
+/* Check if its valid */
     if (md->screenPrivateIndex < 0)
     {
-// Its invalid so free memory and return
+/* Its invalid so free memory and return */
         free (md);
         return FALSE;
     }
@@ -652,10 +657,10 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
     {
         md->blob[j].id = 0;
         md->blob[j].w = 0;
+        md->blob[j].oldx = 0;
     }
-
-    md->tuioenabled = FALSE;
-// Record the display
+    md->TuioFwdEnabled = FALSE;
+/* Record the display */
     d->base.privates[displayPrivateIndex].ptr = md;
 //     multitouchSetToggleTuioInitiate (d, multitouchToggle);
     return TRUE;
@@ -665,9 +670,9 @@ static void
 multitouchFiniDisplay (CompPlugin * p, CompDisplay * d)
 {
     MULTITOUCH_DISPLAY (d);
-// Free the private index
+/* Free the private index */
     freeScreenPrivateIndex (d, md->screenPrivateIndex);
-// Free the pointer
+/* Free the pointer */
     free (md);
 }
 
