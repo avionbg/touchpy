@@ -282,7 +282,7 @@ $(BUILDDIR)/compiz-%.pc: compiz-%.pc.in
 
 $(BUILDDIR)/%.lo: %.c $(h-files)
 	@if [ '$(color)' != 'no' ]; then \
-		$(ECHO) -n -e "\033[0;1;5mcompiling \033[0m: \033[0;32m$< \033[0m-> \033[0;31m$@\033[0m"; \
+		$(ECHO) -n -e "\033[0;1;5mcompiling \033[0m: \033[0;32m$< \033[0m-> \033[0;31m$@\033[0m\n"; \
 	else \
 		$(ECHO) "compiling $< -> $@"; \
 	fi
