@@ -1,6 +1,16 @@
 <compiz>
 	<plugin name="multitouch" useBcop="true">
 		<short>Multitouch input</short>
+		<deps>
+			<requirement>
+			<plugin>wobbly</plugin>
+			</requirement>
+			<relation type="after">
+			<plugin>decoration</plugin>
+			<plugin>water</plugin>
+			<plugin>wobbly</plugin>
+			</relation>
+		</deps>
 		<long>Use multitouch screens trough tuio protocol to drive various plugins</long>
 		<category>Accessibility</category>
 		<display>
