@@ -14,28 +14,53 @@
 		<long>Use multitouch screens trough tuio protocol to drive various plugins</long>
 		<category>Accessibility</category>
 		<display>
-			<group>
-				<short>Key Bindings</short>
-				<option name="toggle_annotate" type="key">
-					<short>Toggle annotate</short>
-					<long>Toggle using annotate plugin to draw on the screen.</long>
-					<default>&lt;Super&gt;F9</default>
-				</option>
-				<option name="toggle_ripple" type="key">
-					<short>Toggle ripple</short>
-					<long>Toggle using water plugin to draw ripples effect on the screen.</long>
-					<default>&lt;Super&gt;F10</default>
-				</option>
-			</group>
-		</display>
-		<screen>
-			<group>
+			<short>Key Bindings</short>
+			<option name="toggle_multitouch" type="key">
+				<short>Toggle the plugin</short>
+				<long>Toggle the plugin on/off (needed if you change the port).</long>
+				<default>&lt;Super&gt;F8</default>
+			</option>
+			<option name="toggle_debug" type="key">
+				<short>Toggle debug output</short>
+				<long>Toggle detaigled debug output of what's happening.</long>
+				<default>&lt;Super&gt;F9</default>
+			</option>
+			<option name="toggle_fwd" type="key">
+				<short>Toggle tuio forwarding</short>
+				<long>Toggle forwarding of tuio messages to other port.</long>
+				<default>&lt;Super&gt;F10</default>
+			</option>
+			<option name="toggle_wm" type="key">
+				<short>Toggle gestures</short>
+				<long>Toggle mouse emulation,moving and resizing windows.</long>
+				<default>&lt;Super&gt;F11</default>
+			</option>
+			<option name="toggle_effects" type="key">
+				<short>Switch effects</short>
+				<long>Switch from annotate to water wave or disable effects.</long>
+				<default>&lt;Super&gt;F12</default>
+			</option>
+			<option name="effect" type="int">
+				<short>Choose effect</short>
+				<long>Choose ripples or annotate on the screen.</long>
+				<min>0</min>
+				<max>2</max>
+				<default>0</default>
+				<desc>
+					<value>0</value>
+					<name>Disabled</name>
+				</desc>
+				<desc>
+					<value>1</value>
+					<name>Ripples</name>
+				</desc>
+				<desc>
+					<value>2</value>
+					<name>Annotate</name>
+				</desc>
+			</option>
+			<subgroup>
 				<short>Tuio handling</short>
-				<option name="toggle_tuio" type="key">
-					<short>Toggle raw tuio parsing</short>
-					<long>Toggle raw tuio parsing instead receiving commands from shared memory.</long>
-					<default>&lt;Super&gt;F8</default>
-				</option>
 				<option name="port" type="int">
 					<short>Tuio Port</short>
 					<long>Tuio Port on which we should listen for the messages.</long>
@@ -43,22 +68,31 @@
 					<min>1024</min>
 					<max>65535</max>
 				</option>
-				<subgroup>
-					<short>Forwarding messages</short>
-					<option name="toggle_forw" type="bool">
-						<short>Toggle tuio forwarding</short>
-						<long>Toggle forwarding of tuio messages to other port.</long>
-						<default>true</default>
-					</option>
-					<option name="fwdport" type="int">
-						<short>Tuio fwd Port</short>
-						<long>Port on which tuio messages are forwarded.</long>
-						<default>3300</default>
-						<min>1024</min>
-						<max>65535</max>
-					</option>
-				</subgroup>
-			</group>
+				<option name="enable_fwd" type="bool">
+					<short>Enable tuio forwarding</short>
+					<long>Enable forwarding of tuio messages to other port on plugin start.</long>
+					<default>true</default>
+				</option>
+				<option name="fwdport" type="int">
+					<short>Tuio fwd Port</short>
+					<long>Port on which tuio messages are forwarded.</long>
+					<default>3300</default>
+					<min>1024</min>
+					<max>65535</max>
+				</option>
+			</subgroup>
+		</display>
+		<screen>
+			<subgroup>
+				<short>Annotate related settings</short>
+				<option type="color" name="fill_color">
+					<short>Annotate Fill Color</short>
+					<long>Fill color for annotations</long>
+					<default>
+						<red>0xffff</red>
+					</default>
+				</option>
+			</subgroup>
 		</screen>
 	</plugin>
 </compiz>
