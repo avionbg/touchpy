@@ -178,6 +178,97 @@ static int findWindowAtPoint ( int x, int y)
 }
 
 /*
+ * Move (warp) the cursor to specified coordinates
+ * name: moveCursorTo
+ * @param int x, int y, CompDisplay *d
+ * @return void
+ */
+
+static void moveCursorTo(int x, int y)
+{
+    char *display_name;
+    Display *d;
+    if ( (display_name = getenv("DISPLAY")) == (void *)NULL)
+    {
+        compLogMessage (firstDisplay, "multitouch", CompLogLevelError,
+                        "Error: DISPLAY environment variable not set!");
+        return;
+    }
+    if ((d = XOpenDisplay(display_name)) == NULL)
+    {
+        compLogMessage (firstDisplay, "multitouch", CompLogLevelError,
+                        "Error: Can't open display: %s!", display_name);
+        return;
+    }
+    Window root;
+    int s;
+    root = currentRoot;
+    s = XGrabPointer(d,root,True,ButtonPressMask | EnterWindowMask,GrabModeSync,
+                     GrabModeSync,None,None,CurrentTime);
+    XWarpPointer(d,None,root,0,0,0,0,x,y);
+    XUngrabPointer(d,CurrentTime);
+    XFlush(d);
+    XCloseDisplay(d);
+}
+
+/*
+ * name: mouseClick
+ * @param int button, CompDisplay * d
+ * @return void
+ */
+
+static void mouseClick(int button, CompDisplay * d)
+{
+    XEvent event;
+
+    memset(&event, 0x00, sizeof(event));
+    event.type = ButtonPress;
+    event.xbutton.button = button;
+    event.xbutton.same_screen = True;
+
+    XQueryPointer(d->display,currentRoot,
+                  &event.xbutton.root,
+                  &event.xbutton.window,
+                  &event.xbutton.x_root,
+                  &event.xbutton.y_root,
+                  &event.xbutton.x,
+                  &event.xbutton.y,
+                  &event.xbutton.state);
+
+    event.xbutton.subwindow = event.xbutton.window;
+
+    while (event.xbutton.subwindow)
+    {
+        event.xbutton.window = event.xbutton.subwindow;
+        XQueryPointer(d->display,
+                      event.xbutton.window,
+                      &event.xbutton.root,
+                      &event.xbutton.subwindow,
+                      &event.xbutton.x_root,
+                      &event.xbutton.y_root,
+                      &event.xbutton.x,
+                      &event.xbutton.y,
+                      &event.xbutton.state);
+    }
+
+    if (XSendEvent(d->display, PointerWindow,
+                   True, 0xfff, &event)==0)
+        printf("XSendEvent() error!\n");
+
+    XFlush(d->display);
+    usleep(100000);
+
+    event.type = ButtonRelease;
+    event.xbutton.state = 0x100;
+
+    if (XSendEvent(d->display, PointerWindow,
+                   True, 0xfff, &event)==0)
+        printf("XSendEvent() error2!\n");
+
+    XFlush(d->display);
+}
+
+/*
  * Send commands trough action system of the compiz to other plugins
  * name: sendInfoToPlugin
  * @param display, argument, nArgument, pluginName, actionName
@@ -520,7 +611,7 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
     CompScreen *s;
     s = findScreenAtDisplay (d, currentRoot);
     mtblob *blobs = md->blob;
-    int k,multiblobs;
+    int k,multiblobs,oldestblob;
     int wid = 0;
     MULTITOUCH_SCREEN(s);
     switch (event)
@@ -540,6 +631,14 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
                 md->timeoutHandles = compAddTimeout (0,makeannotate, dv);
             else md->timeoutHandles = compAddTimeout (0,makeripple, dv);
         }
+        oldestblob = blobs[BlobID].id;
+        for ( k=0;k<MAXBLOBS; k++)
+        {
+            if (blobs[k].id && blobs[k].id < oldestblob)
+                oldestblob=blobs[k].id;
+        }
+        if (oldestblob == blobs[BlobID].id)
+            moveCursorTo(blobs[BlobID].x * s->width,blobs[BlobID].y * s->height); // We are first blob/move the cursor
         if ( blobs[BlobID].w ) // We have window id attached to blob
         {
             for (k=0;k<MAXBLOBS; k++)
