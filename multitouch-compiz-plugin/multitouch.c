@@ -53,9 +53,10 @@ typedef enum
 
 typedef enum
 {
-    ActionAnnotate = 1,
-    ActionRipple = 2
-}mtAction;
+    Disabled = 0,
+    Annotate = 1,
+    Ripple = 2
+}mtEffect;
 
 typedef struct
 {
@@ -67,11 +68,6 @@ typedef struct
 {
     unsigned short R,G,B,A;
 } mtcolor;
-
-typedef struct
-{
-    int id, x, y;
-}mtclick;
 
 /* This struct is used as closure for timeouts */
 typedef struct _DisplayValue
@@ -87,17 +83,22 @@ typedef struct _DisplayValue
 typedef struct _MultitouchDisplay
 {
     int screenPrivateIndex;
+    char port[6];
+    int fwdport;
+    Bool enabled;
+    Bool Debug;
+    Bool Wm;
+    Bool TuioFwd;
+    lo_server_thread st;
     mtblob blob[MAXBLOBS];
     mtcolor color;
-    mtAction CurrentEffect;
     CompTimeoutHandle timeoutHandles;
     CompTimeoutHandle clickTimeoutHandle;
 } MultitouchDisplay;
 
 typedef struct _MultitouchScreen
 {
-    lo_server_thread st;
-    Bool TuioFwdEnabled;
+    mtEffect CurrentEffect;
 } MultitouchScreen;
 
 #define GET_MULTITOUCH_DISPLAY(d) \
@@ -109,18 +110,16 @@ MultitouchDisplay *md = GET_MULTITOUCH_DISPLAY (d)
 #define MULTITOUCH_SCREEN(s) \
 MultitouchScreen *ms = GET_MULTITOUCH_SCREEN (s, GET_MULTITOUCH_DISPLAY (s->display))
 
-/* TODO: Add toggling the effects trough key/gestures
- * draw debug info on cairo, animated effect for each blob, pie (radial) menu
- */
+/* TODO: draw debug info on cairo, animated effect for each blob, pie (radial) menu */
 
 /*
  * get the topmost xlib window id from x,y coordinates
- * name: point2wid
- * @param pointx,pointy
+ * name: findWindowAtPoint
+ * @param x,y
  * @return wid
  */
 
-static int point2wid( int pointx, int pointy)
+static int findWindowAtPoint ( int x, int y)
 {
     /*
      * To do this properly, we need to open another client connection to X
@@ -161,7 +160,7 @@ static int point2wid( int pointx, int pointy)
                 Window child_return;
                 XTranslateCoordinates(d, root, winattr.root,
                                       winattr.x, winattr.y, &tx, &ty, &child_return);
-                if ( ( tx < pointx ) && ( ty < pointy ) && ( ( winattr.width + tx ) > pointx ) && ( ( winattr.height + ty ) > pointy ) )
+                if ( ( tx < x ) && ( ty < y ) && ( ( winattr.width + tx ) > x ) && ( ( winattr.height + ty ) > y ) )
                     wid = wins[j] ;
             }
         }
@@ -233,13 +232,110 @@ sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
     return TRUE;
 }
 
+/* Change notify for bcop
+ * TODO: doesn't work at the moment 4 unknown reason */
+static void
+multitouchDisplayOptionChanged (CompDisplay             *d,
+			       CompOption              *opt,
+			       MultitouchDisplayOptions num)
+{
+    MULTITOUCH_DISPLAY (d);
+    switch (num) {
+    case MultitouchDisplayOptionPort:
+    sprintf (md->port,"%d",multitouchGetPort (d));
+    if (md->Debug)
+	    printf ("notify port:%s\n",md->port);
+	break;
+    case MultitouchDisplayOptionEnableFwd:
+	md->TuioFwd = multitouchGetEnableFwd(d);
+    if (md->Debug)
+        printf ("notify fwd:%d\n",md->TuioFwd);
+	break;
+    case MultitouchDisplayOptionFwdport:
+    md->fwdport = multitouchGetFwdport(d);
+    if (md->Debug)
+        printf ("notify portfwd:%d\n",md->fwdport);
+	break;
+    default:
+	break;
+    }
+}
+
 static Bool
-multitouchToggle (CompScreen *s,
+multitouchToggleDebug (CompDisplay *d,
                   CompAction * action,
                   CompActionState state, CompOption * option, int nOption)
 {
-    MULTITOUCH_SCREEN(s);
-    ms->TuioFwdEnabled = !ms->TuioFwdEnabled;
+    MULTITOUCH_DISPLAY(d);
+    md->Debug = !md->Debug;
+    if (md->Debug)
+        printf ("Debug enabled\n");
+    else printf ("Debug disabled\n");
+    return FALSE;
+}
+
+static Bool
+multitouchToggleWm (CompDisplay *d,
+                  CompAction * action,
+                  CompActionState state, CompOption * option, int nOption)
+{
+    MULTITOUCH_DISPLAY(d);
+    md->Wm = !md->Wm;
+    if (md->Debug && md->Wm)
+        printf ("Gestures enabled\n");
+    else
+    {
+    if (md->Debug)
+        printf ("Gestures disabled\n");
+    mtblob *blobs = md->blob;
+    int i;
+    for (i=0;i<MAXBLOBS; i++)
+        {
+        if ( blobs[i].w )   // cleaning window id from blobs
+            blobs[i].w = 0;
+        }
+    }
+    return FALSE;
+}
+
+static Bool
+multitouchToggleFwd (CompDisplay *d,
+                  CompAction * action,
+                  CompActionState state, CompOption * option, int nOption)
+{
+        MULTITOUCH_DISPLAY(d);
+        md->TuioFwd = !md->TuioFwd;
+        if (md->Debug && md->TuioFwd)
+            printf ("Tuio Forwarding enabled\n");
+        else if (md->Debug)
+            printf ("Tuio Forwarding disabled\n");
+    return FALSE;
+}
+
+static Bool
+multitouchToggleEffects (CompDisplay *d,
+                  CompAction * action,
+                  CompActionState state, CompOption * option, int nOption)
+{
+    CompScreen *s;
+    s = findScreenAtDisplay (d, currentRoot);
+    if (s)
+    {
+        MULTITOUCH_DISPLAY(d);
+        MULTITOUCH_SCREEN (s);
+        if (ms->CurrentEffect == Ripple)
+            ms->CurrentEffect = Disabled;
+        else
+            {
+            ms->CurrentEffect++;
+            if (md->Debug)
+                printf ("Current effect num: %d",ms->CurrentEffect);
+            }
+        if (md->Debug && ms->CurrentEffect)
+            printf (" enabled\n");
+        else if (md->Debug)
+            printf ("Effects disabled\n");
+    }
     return FALSE;
 }
 
@@ -347,8 +443,6 @@ makeannotate (void *data)
         arg[nArg].value.c[1]=color->G;
         arg[nArg].value.c[2]=color->B;
         arg[nArg].value.c[3]=color->A;
-        //printf("Adresa: %p %x Podatci za crtanje: %d %d %d %d Podatci iz memorije: %d %d %d %d\n",color,(unsigned int) color,
-            //arg[nArg].value.c[0],arg[nArg].value.c[1],arg[nArg].value.c[2],arg[nArg].value.c[3],color->R,color->G,color->B,color->A);
         nArg++;
 
         arg[nArg].name = "line_width";
@@ -423,21 +517,28 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
 {
     MULTITOUCH_DISPLAY (d);
     CompScreen *s;
+    s = findScreenAtDisplay (d, currentRoot);
     mtblob *blobs = md->blob;
     int k,multiblobs;
     int wid = 0;
-    s = findScreenAtDisplay (d, currentRoot);
+    MULTITOUCH_SCREEN(s);
     switch (event)
     {
     case EventMove:
-        printf("Move handler - blobID: %d\n",blobs[BlobID].id);
+        if (md->Debug)
+            printf("Move handler - blobID: %d\n",blobs[BlobID].id);
+        if (ms->CurrentEffect)
+        {
         DisplayValue *dv = malloc (sizeof (DisplayValue));
         dv->display = d;
         dv->x0 = blobs[BlobID].x;
         dv->y0 = blobs[BlobID].y;
         dv->x1 = blobs[BlobID].oldx;
         dv->y1 = blobs[BlobID].oldy;
-        md->timeoutHandles = compAddTimeout (0,makeannotate, dv);
+        if (ms->CurrentEffect == Annotate)
+            md->timeoutHandles = compAddTimeout (0,makeannotate, dv);
+        else md->timeoutHandles = compAddTimeout (0,makeripple, dv);
+        }
         if ( blobs[BlobID].w ) // We have window id attached to blob
         {
             for (k=0;k<MAXBLOBS; k++)
@@ -452,25 +553,26 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
             if (multiblobs && blobs[multiblobs].oldx) // Multiple blobs, do the resizing
             {
                 CompWindow *  w = (void *) blobs[BlobID].w;
-                int dx = (dv->x1 - dv->x0) * s->width;
-                int dy = (dv->y1 - dv->y0) * s->height;
+                int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
+                int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
                 resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
             }
             else // Single blob, do just the movement
             {
-                int dx = (dv->x1 - dv->x0) * s->width;
-                int dy = (dv->y1 - dv->y0) * s->height;
+                int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
+                int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
+                if (md->Debug)
+                    printf("movewindow id: %d, x%d , y:%d\n", blobs[BlobID].w, dx,dy );
                 CompWindow *  w = (void *) blobs[BlobID].w;
                 moveWindow(w, dx, dy, TRUE, FALSE);
-                printf("movewindow id: %d, x%d , y:%d\n", blobs[BlobID].w, dx,dy );
             }
         }
         break;
     case EventDown:
-        printf("Down handler - blobID: %d\n",blobs[BlobID].id);
-                        // enable/disable under to have windows movement
-                //int wid = point2wid((int) s->width * argv[2]->f,(int) s->height * argv[3]->f);
-                //printf ("wid:%d \n", wid);
+        if (md->Wm)
+            wid = findWindowAtPoint ((int) s->width * blobs[BlobID].x,(int) s->height * blobs[BlobID].y);
+        if (md->Debug)
+            printf("Down handler - blobID: %d WindowID: %d\n",blobs[BlobID].id, wid);
         if (wid)
         {
             CompWindow * w = (CompWindow *) findWindowAtDisplay (s->display, wid);
@@ -480,7 +582,8 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
         }
         break;
     case EventUp:
-        printf("Up handler - blobID: %d\n",blobs[BlobID].id);
+        if (md->Debug)
+            printf("Up handler - blobID: %d\n",blobs[BlobID].id);
         if (blobs[BlobID].w)
         {
             CompWindow * w = (void *) blobs[BlobID].w;
@@ -495,7 +598,6 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
     default:
         break;
     }
-//return 0;
 }
 
 /* Callback handlers */
@@ -505,8 +607,9 @@ static void loerror(int num, const char *msg, const char *path)
     compLogMessage (firstDisplay, "multitouch", CompLogLevelFatal,
                     "liblo server error %d in path %s: %s", num, path, msg);
 }
+
 static int tuioFwd_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                           void *data, void *screen)
+                           void *data, void *display)
 {
     //CompScreen *s = (CompScreen *) screen;
     //lo_address t = lo_address_new(NULL, "3330")
@@ -521,27 +624,28 @@ static int tuioFwd_handler(const char *path, const char *types, lo_arg **argv, i
 }
 
 static int command_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                           void *data, void *screen)
+                           void *data, void *display)
 {
-    CompScreen *s = (CompScreen *) screen;
-
-    MULTITOUCH_DISPLAY (s->display);
+    CompDisplay *d = (CompDisplay *) display;
+    CompScreen *s;
+    s = findScreenAtDisplay (d, currentRoot);
+    MULTITOUCH_DISPLAY (d);
+    MULTITOUCH_SCREEN (s);
     int j;
     mtcolor *color = &(md->color);
     if ( !strcmp((char *) argv[0],"color"))
     {
-        printf("Adresa: %p Dobijeno: %d %d %d %d\n", color, argv[1]->i,argv[2]->i,argv[3]->i,argv[4]->i);
         color->R = argv[1]->i;
         color->G = argv[2]->i;
         color->B = argv[3]->i;
         color->A = argv[4]->i;
-        printf("Adresa: %p Stanje u memoriji: %d %d %d %d\n", color,color->R,color->G,color->B,color->A);
     }
     else if ( !strcmp((char *) argv[0],"toggle"))
     {
-        if ( md->CurrentEffect == ActionAnnotate )
-            md->CurrentEffect = ActionRipple;
-        else md->CurrentEffect = ActionAnnotate;
+        if ( !ms->CurrentEffect )
+            ms->CurrentEffect = Annotate;
+        else if (ms->CurrentEffect == Annotate)
+            ms->CurrentEffect = Ripple;
     }
     else
     {
@@ -556,10 +660,11 @@ static int command_handler(const char *path, const char *types, lo_arg **argv, i
 }
 
 static int tuio2Dobj_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                             void *data, void *screen)
+                             void *data, void *display)
 {
-    CompScreen *s = (CompScreen *) screen;
-    MULTITOUCH_SCREEN (s);
+    CompDisplay *d = (CompDisplay *) display;
+    MULTITOUCH_DISPLAY (d);
+    return md->TuioFwd;
     int j;
     for (j=0; j<argc; j++)
     {
@@ -567,15 +672,18 @@ static int tuio2Dobj_handler(const char *path, const char *types, lo_arg **argv,
         lo_arg_pp(types[j], argv[j]);
         printf("\n");
     }
-    return ms->TuioFwdEnabled;
+    return md->TuioFwd;
 }
 
 static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                             void *data, void *screen)
+                             void *data, void *display)
 {
-    CompScreen *s = (CompScreen *) screen;
-    MULTITOUCH_DISPLAY (s->display);
-    MULTITOUCH_SCREEN (s);
+    CompDisplay *d = (CompDisplay *) display;
+    CompScreen *s;
+    s = findScreenAtDisplay (d, currentRoot);
+
+    MULTITOUCH_DISPLAY (d);
+    //MULTITOUCH_SCREEN (s);
     mtblob *blobs = md->blob;
     int j,alive[MAXBLOBS];
     int found = 0;
@@ -583,7 +691,7 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
     {
         for (j = 0; j < MAXBLOBS; j++)
         {
-            /* we are already in the list, so just update x,y (move handler) */
+            /* we are already in the list, so just update x,y (MOVE EVENT) */
             if (blobs[j].id == argv[1]->i)
             {
                 blobs[j].oldx = blobs[j].x; // store old X in blobs[] also
@@ -593,9 +701,9 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                 click_handler(EventMove, s->display,j); 
                 found = 1;
                 break;
-            } // if
-        } // for
-        /* do we have new blob? (touch down handler) */
+            }
+        }
+        /* do we have new blob? (TOUCH DOWN EVENT) */
         if (!found)
         {
             int slot = -1;
@@ -607,7 +715,6 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                     break;
                 }
             }
-            //printf("down handler: slot: %d blobID: %d\n",slot,argv[1]->i);
             if (slot != -1)
             {
                 blobs[j].id = argv[1]->i;
@@ -617,9 +724,9 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                 blobs[j].ymot = argv[5]->f;
                 blobs[j].mot_accel = argv[6]->f;
                 click_handler(EventDown, s->display, j);
-            } // if
-        } // if
-    } // if
+            }
+        }
+    }
     else if ( !strcmp((char *) argv[0],"alive"))
     {
         for (j=1;j<argc;j++)
@@ -630,14 +737,14 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
         {
             if (blobs[j].id)
             {
-                /* check if we have blobs that alive packet doesn't have (touch up handler) */
+                /* check if we have blobs that alive packet doesn't have (TOUCH UP EVENT) */
                 if (!(isMemberOfSet (alive, MAXBLOBS, blobs[j].id)))
                 {
                     click_handler(EventUp, s->display, j);
                     break;
                 }
-            } // if
-        } // for
+            }
+        }
     }
     else
     {
@@ -649,7 +756,54 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
             printf("\n");
         }
     }
-    return ms->TuioFwdEnabled;
+    return md->TuioFwd;
+}
+
+static Bool
+multitouchToggleMultitouch (CompDisplay *d,
+                  CompAction * action,
+                  CompActionState state, CompOption * option, int nOption)
+{
+        MULTITOUCH_DISPLAY(d);
+        md->enabled = !md->enabled;
+        if (md->Debug && md->enabled)
+        {
+            CompScreen *s;
+            int j;
+            s = findScreenAtDisplay (d, currentRoot);
+            MULTITOUCH_SCREEN(s);
+            int unsigned short *fillcolor;
+            fillcolor = multitouchGetFillColor(s);
+            sprintf (md->port,"%d",multitouchGetPort (d));
+            ms->CurrentEffect = multitouchGetEffect(d);
+            md->TuioFwd = multitouchGetEnableFwd(d);
+            md->fwdport = multitouchGetFwdport(d);
+            md->color.R = fillcolor[0];
+            md->color.G = fillcolor[1];
+            md->color.B = fillcolor[2];
+            md->color.A = fillcolor[3];
+            for (j=0;j<MAXBLOBS;j++)
+            {
+                md->blob[j].id = 0;
+                md->blob[j].w = 0;
+                md->blob[j].oldx = 0;
+            }
+            md->st = lo_server_thread_new(md->port, loerror);
+            lo_server_thread_add_method(md->st, "/tuio/2Dobj", NULL, tuio2Dobj_handler, d);
+            lo_server_thread_add_method(md->st, "/tuio/2Dcur", NULL, tuio2Dcur_handler, d);
+            lo_server_thread_add_method(md->st, "/command", NULL, command_handler, d);
+            lo_server_thread_add_method(md->st, NULL, NULL, tuioFwd_handler, d);
+            lo_server_thread_start(md->st);
+            if (md->Debug)
+                printf ("Multitouch enabled Port: %s Forwarding: %d Port-fwd: %d color RGBA: %d %d %d %d\n",md->port, (int) md->TuioFwd, (int) md->fwdport,fillcolor[0],fillcolor[1],fillcolor[2],fillcolor[3]);
+        }
+        else
+        {
+        if (md->Debug)
+            printf ("Multitouch disabled\n");
+            lo_server_thread_free(md->st);
+        }
+    return FALSE;
 }
 
 /* Plugin Initialization */
@@ -677,21 +831,10 @@ multitouchInitScreen (CompPlugin * p, CompScreen * s)
 {
     MultitouchScreen *ms;
     MULTITOUCH_DISPLAY (s->display);
-    char port[6];
-    sprintf (port,"%d",multitouchGetPort (s));
     ms = malloc (sizeof (MultitouchScreen));
     if (!ms)
         return FALSE;
     s->base.privates[md->screenPrivateIndex].ptr = ms;
-    //multitouchSetToggleTuioInitiate (s, multitouchToggle);
-    ms->TuioFwdEnabled = FALSE;
-    ms->st = lo_server_thread_new(port, loerror);
-    //lo_server_thread_add_method(ms->st, "/tuio/2Dobj", NULL, tuio2Dobj_handler, s);
-    lo_server_thread_add_method(ms->st, "/tuio/2Dcur", NULL, tuio2Dcur_handler, s);
-    lo_server_thread_add_method(ms->st, "/command", NULL, command_handler, s);
-    //lo_server_thread_add_method(ms->st, NULL, NULL, tuioFwd_handler, s);
-    lo_server_thread_start(ms->st);
-
     return TRUE;
 }
 
@@ -699,7 +842,6 @@ static void
 multitouchFiniScreen (CompPlugin * p, CompScreen * s)
 {
     MULTITOUCH_SCREEN (s);
-    lo_server_thread_free(ms->st);
     free (ms);
 }
 
@@ -708,7 +850,6 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
 {
     /* Generate a Multitouch display */
     MultitouchDisplay *md;
-    int j;
     if (!checkPluginABI ("core", CORE_ABIVERSION))
         return FALSE;
     md = malloc (sizeof (MultitouchDisplay));
@@ -723,19 +864,23 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
         free (md);
         return FALSE;
     }
-    //md->color.R = 0x0;
-    //md->color.G = 0x0;
-    //md->color.B = 0x0;
-    //md->color.A = 0xffff;
-
-    for (j=0;j<MAXBLOBS;j++)
-    {
-        md->blob[j].id = 0;
-        md->blob[j].w = 0;
-        md->blob[j].oldx = 0;
-    }
     /* Record the display */
     d->base.privates[displayPrivateIndex].ptr = md;
+    //multitouchSetPortNotify (d, multitouchDisplayOptionChanged);
+    //multitouchSetEnableFwdNotify (d, multitouchDisplayOptionChanged);
+    //multitouchSetFwdportNotify (d, multitouchDisplayOptionChanged);
+    md->TuioFwd = multitouchGetEnableFwd(d);
+    md->enabled = FALSE;
+    md->Debug = TRUE;
+    md->Wm = FALSE;
+    //sprintf (port,"%d",multitouchGetPort (d));
+    //md->TuioFwd = multitouchGetEnableFwd(d);
+    //md->fwdport = multitouchGetFwdport(d);
+    multitouchSetToggleMultitouchInitiate (d, multitouchToggleMultitouch);
+    multitouchSetToggleDebugInitiate (d, multitouchToggleDebug);
+    multitouchSetToggleFwdInitiate (d, multitouchToggleFwd);
+    multitouchSetToggleWmInitiate (d, multitouchToggleWm);
+    multitouchSetToggleEffectsInitiate (d, multitouchToggleEffects);
     return TRUE;
 }
 
