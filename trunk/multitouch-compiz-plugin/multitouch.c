@@ -84,7 +84,7 @@ typedef struct _MultitouchDisplay
 {
     int screenPrivateIndex;
     char port[6];
-    int fwdport;
+    char fwdport[6];
     Bool enabled;
     Bool Debug;
     Bool Wm;
@@ -236,35 +236,36 @@ sendInfoToPlugin (CompDisplay * d, CompOption * argument, int nArgument,
  * TODO: doesn't work at the moment 4 unknown reason */
 static void
 multitouchDisplayOptionChanged (CompDisplay             *d,
-			       CompOption              *opt,
-			       MultitouchDisplayOptions num)
+                                CompOption              *opt,
+                                MultitouchDisplayOptions num)
 {
     MULTITOUCH_DISPLAY (d);
-    switch (num) {
+    switch (num)
+    {
     case MultitouchDisplayOptionPort:
-    sprintf (md->port,"%d",multitouchGetPort (d));
-    if (md->Debug)
-	    printf ("notify port:%s\n",md->port);
-	break;
+        sprintf (md->port,"%d",multitouchGetPort (d));
+        if (md->Debug)
+            printf ("notify port:%s\n",md->port);
+        break;
     case MultitouchDisplayOptionEnableFwd:
-	md->TuioFwd = multitouchGetEnableFwd(d);
-    if (md->Debug)
-        printf ("notify fwd:%d\n",md->TuioFwd);
-	break;
+        md->TuioFwd = multitouchGetEnableFwd(d);
+        if (md->Debug)
+            printf ("notify fwd:%d\n",md->TuioFwd);
+        break;
     case MultitouchDisplayOptionFwdport:
-    md->fwdport = multitouchGetFwdport(d);
-    if (md->Debug)
-        printf ("notify portfwd:%d\n",md->fwdport);
-	break;
+        sprintf (md->fwdport,"%d",multitouchGetFwdport (d));
+        if (md->Debug)
+            printf ("notify portfwd:%s\n",md->fwdport);
+        break;
     default:
-	break;
+        break;
     }
 }
 
 static Bool
 multitouchToggleDebug (CompDisplay *d,
-                  CompAction * action,
-                  CompActionState state, CompOption * option, int nOption)
+                       CompAction * action,
+                       CompActionState state, CompOption * option, int nOption)
 {
     MULTITOUCH_DISPLAY(d);
     md->Debug = !md->Debug;
@@ -276,8 +277,8 @@ multitouchToggleDebug (CompDisplay *d,
 
 static Bool
 multitouchToggleWm (CompDisplay *d,
-                  CompAction * action,
-                  CompActionState state, CompOption * option, int nOption)
+                    CompAction * action,
+                    CompActionState state, CompOption * option, int nOption)
 {
     MULTITOUCH_DISPLAY(d);
     md->Wm = !md->Wm;
@@ -285,14 +286,14 @@ multitouchToggleWm (CompDisplay *d,
         printf ("Gestures enabled\n");
     else
     {
-    if (md->Debug)
-        printf ("Gestures disabled\n");
-    mtblob *blobs = md->blob;
-    int i;
-    for (i=0;i<MAXBLOBS; i++)
+        if (md->Debug)
+            printf ("Gestures disabled\n");
+        mtblob *blobs = md->blob;
+        int i;
+        for (i=0;i<MAXBLOBS; i++)
         {
-        if ( blobs[i].w )   // cleaning window id from blobs
-            blobs[i].w = 0;
+            if ( blobs[i].w )   // cleaning window id from blobs
+                blobs[i].w = 0;
         }
     }
     return FALSE;
@@ -300,22 +301,22 @@ multitouchToggleWm (CompDisplay *d,
 
 static Bool
 multitouchToggleFwd (CompDisplay *d,
-                  CompAction * action,
-                  CompActionState state, CompOption * option, int nOption)
+                     CompAction * action,
+                     CompActionState state, CompOption * option, int nOption)
 {
-        MULTITOUCH_DISPLAY(d);
-        md->TuioFwd = !md->TuioFwd;
-        if (md->Debug && md->TuioFwd)
-            printf ("Tuio Forwarding enabled\n");
-        else if (md->Debug)
-            printf ("Tuio Forwarding disabled\n");
+    MULTITOUCH_DISPLAY(d);
+    md->TuioFwd = !md->TuioFwd;
+    if (md->Debug && md->TuioFwd)
+        printf ("Tuio Forwarding enabled\n");
+    else if (md->Debug)
+        printf ("Tuio Forwarding disabled\n");
     return FALSE;
 }
 
 static Bool
 multitouchToggleEffects (CompDisplay *d,
-                  CompAction * action,
-                  CompActionState state, CompOption * option, int nOption)
+                         CompAction * action,
+                         CompActionState state, CompOption * option, int nOption)
 {
     CompScreen *s;
     s = findScreenAtDisplay (d, currentRoot);
@@ -326,11 +327,11 @@ multitouchToggleEffects (CompDisplay *d,
         if (ms->CurrentEffect == Ripple)
             ms->CurrentEffect = Disabled;
         else
-            {
+        {
             ms->CurrentEffect++;
             if (md->Debug)
                 printf ("Current effect num: %d",ms->CurrentEffect);
-            }
+        }
         if (md->Debug && ms->CurrentEffect)
             printf (" enabled\n");
         else if (md->Debug)
@@ -529,15 +530,15 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
             printf("Move handler - blobID: %d\n",blobs[BlobID].id);
         if (ms->CurrentEffect)
         {
-        DisplayValue *dv = malloc (sizeof (DisplayValue));
-        dv->display = d;
-        dv->x0 = blobs[BlobID].x;
-        dv->y0 = blobs[BlobID].y;
-        dv->x1 = blobs[BlobID].oldx;
-        dv->y1 = blobs[BlobID].oldy;
-        if (ms->CurrentEffect == Annotate)
-            md->timeoutHandles = compAddTimeout (0,makeannotate, dv);
-        else md->timeoutHandles = compAddTimeout (0,makeripple, dv);
+            DisplayValue *dv = malloc (sizeof (DisplayValue));
+            dv->display = d;
+            dv->x0 = blobs[BlobID].x;
+            dv->y0 = blobs[BlobID].y;
+            dv->x1 = blobs[BlobID].oldx;
+            dv->y1 = blobs[BlobID].oldy;
+            if (ms->CurrentEffect == Annotate)
+                md->timeoutHandles = compAddTimeout (0,makeannotate, dv);
+            else md->timeoutHandles = compAddTimeout (0,makeripple, dv);
         }
         if ( blobs[BlobID].w ) // We have window id attached to blob
         {
@@ -611,15 +612,25 @@ static void loerror(int num, const char *msg, const char *path)
 static int tuioFwd_handler(const char *path, const char *types, lo_arg **argv, int argc,
                            void *data, void *display)
 {
-    //CompScreen *s = (CompScreen *) screen;
-    //lo_address t = lo_address_new(NULL, "3330")
+    CompDisplay *d = (CompDisplay *) display;
+    MULTITOUCH_DISPLAY (d);
+    lo_address t = lo_address_new(NULL, md->fwdport);
+    lo_message fwd = lo_message_new();
     int j;
     for (j=0; j<argc; j++)
     {
-        printf("arg %d '%c' ", j, types[j]);
-        lo_arg_pp(types[j], argv[j]);
-        printf("\n");
+        if ( types[j] == 115 )
+            lo_message_add_string( fwd, (char *) argv[j]);
+        else if ( types[j] == 105 )
+            lo_message_add_int32 (fwd, (int) argv[j]->i);
+        else if ( types[j] == 102 )
+            lo_message_add_float (fwd, (float) argv[j]->f);
     }
+    if (lo_send_message (t, path, fwd) == -1 && md->Debug)
+    {
+        printf("OSC error %d: %s\n", lo_address_errno(t), lo_address_errstr(t));
+    }
+    lo_message_free(fwd);
     return 0;
 }
 
@@ -698,7 +709,7 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                 blobs[j].oldy = blobs[j].y;
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
-                click_handler(EventMove, s->display,j); 
+                click_handler(EventMove, s->display,j);
                 found = 1;
                 break;
             }
@@ -761,48 +772,48 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
 
 static Bool
 multitouchToggleMultitouch (CompDisplay *d,
-                  CompAction * action,
-                  CompActionState state, CompOption * option, int nOption)
+                            CompAction * action,
+                            CompActionState state, CompOption * option, int nOption)
 {
-        MULTITOUCH_DISPLAY(d);
-        md->enabled = !md->enabled;
-        if (md->Debug && md->enabled)
+    MULTITOUCH_DISPLAY(d);
+    md->enabled = !md->enabled;
+    if (md->Debug && md->enabled)
+    {
+        CompScreen *s;
+        int j;
+        s = findScreenAtDisplay (d, currentRoot);
+        MULTITOUCH_SCREEN(s);
+        int unsigned short *fillcolor;
+        fillcolor = multitouchGetFillColor(s);
+        sprintf (md->port,"%d",multitouchGetPort (d));
+        sprintf (md->fwdport,"%d",multitouchGetFwdport (d));
+        ms->CurrentEffect = multitouchGetEffect(d);
+        md->TuioFwd = multitouchGetEnableFwd(d);
+        md->color.R = fillcolor[0];
+        md->color.G = fillcolor[1];
+        md->color.B = fillcolor[2];
+        md->color.A = fillcolor[3];
+        for (j=0;j<MAXBLOBS;j++)
         {
-            CompScreen *s;
-            int j;
-            s = findScreenAtDisplay (d, currentRoot);
-            MULTITOUCH_SCREEN(s);
-            int unsigned short *fillcolor;
-            fillcolor = multitouchGetFillColor(s);
-            sprintf (md->port,"%d",multitouchGetPort (d));
-            ms->CurrentEffect = multitouchGetEffect(d);
-            md->TuioFwd = multitouchGetEnableFwd(d);
-            md->fwdport = multitouchGetFwdport(d);
-            md->color.R = fillcolor[0];
-            md->color.G = fillcolor[1];
-            md->color.B = fillcolor[2];
-            md->color.A = fillcolor[3];
-            for (j=0;j<MAXBLOBS;j++)
-            {
-                md->blob[j].id = 0;
-                md->blob[j].w = 0;
-                md->blob[j].oldx = 0;
-            }
-            md->st = lo_server_thread_new(md->port, loerror);
-            lo_server_thread_add_method(md->st, "/tuio/2Dobj", NULL, tuio2Dobj_handler, d);
-            lo_server_thread_add_method(md->st, "/tuio/2Dcur", NULL, tuio2Dcur_handler, d);
-            lo_server_thread_add_method(md->st, "/command", NULL, command_handler, d);
-            lo_server_thread_add_method(md->st, NULL, NULL, tuioFwd_handler, d);
-            lo_server_thread_start(md->st);
-            if (md->Debug)
-                printf ("Multitouch enabled Port: %s Forwarding: %d Port-fwd: %d color RGBA: %d %d %d %d\n",md->port, (int) md->TuioFwd, (int) md->fwdport,fillcolor[0],fillcolor[1],fillcolor[2],fillcolor[3]);
+            md->blob[j].id = 0;
+            md->blob[j].w = 0;
+            md->blob[j].oldx = 0;
         }
-        else
-        {
+        md->st = lo_server_thread_new(md->port, loerror);
+        lo_server_thread_add_method(md->st, "/tuio/2Dobj", NULL, tuio2Dobj_handler, d);
+        lo_server_thread_add_method(md->st, "/tuio/2Dcur", NULL, tuio2Dcur_handler, d);
+        lo_server_thread_add_method(md->st, "/command", NULL, command_handler, d);
+        lo_server_thread_add_method(md->st, NULL, NULL, tuioFwd_handler, d);
+        lo_server_thread_start(md->st);
+        if (md->Debug)
+            printf ("Multitouch enabled Port: %s Forwarding: %d Port-fwd: %s color RGBA: %d %d %d %d\n",md->port, (int) md->TuioFwd, md->fwdport,fillcolor[0],fillcolor[1],fillcolor[2],fillcolor[3]);
+    }
+    else
+    {
         if (md->Debug)
             printf ("Multitouch disabled\n");
-            lo_server_thread_free(md->st);
-        }
+        lo_server_thread_free(md->st);
+    }
     return FALSE;
 }
 
