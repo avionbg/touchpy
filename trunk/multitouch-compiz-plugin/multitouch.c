@@ -605,7 +605,7 @@ isMemberOfSet (int *Set, int size, int value)
     return 0;
 }
 
-static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
+static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
 {
     MULTITOUCH_DISPLAY (d);
     CompScreen *s;
@@ -637,7 +637,7 @@ static void click_handler(mtEvent event, CompDisplay * d,int BlobID)
             if (blobs[k].id && blobs[k].id < oldestblob)
                 oldestblob=blobs[k].id;
         }
-        if (oldestblob == blobs[BlobID].id)
+        if (oldestblob == blobs[BlobID].id && md->Wm )
             moveCursorTo(blobs[BlobID].x * s->width,blobs[BlobID].y * s->height); // We are first blob/move the cursor
         if ( blobs[BlobID].w ) // We have window id attached to blob
         {
@@ -808,7 +808,7 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                 blobs[j].oldy = blobs[j].y;
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
-                click_handler(EventMove, s->display,j);
+                gesture_handler(EventMove, s->display,j);
                 found = 1;
                 break;
             }
@@ -833,7 +833,7 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                 blobs[j].xmot = argv[4]->f;
                 blobs[j].ymot = argv[5]->f;
                 blobs[j].mot_accel = argv[6]->f;
-                click_handler(EventDown, s->display, j);
+                gesture_handler(EventDown, s->display, j);
             }
         }
     }
