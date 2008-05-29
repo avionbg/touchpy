@@ -69,7 +69,18 @@ typedef struct
     unsigned short R,G,B,A;
 } mtcolor;
 
-/* This struct is used as closure for timeouts */
+typedef struct
+{   int id;
+    float x, y;
+} mtclick;
+
+/* This structs are used as closure for timeouts */
+typedef struct _ClickValue
+{
+    CompDisplay *display;
+    int id;
+} ClickValue;
+
 typedef struct _DisplayValue
 {
     CompDisplay *display;
@@ -92,6 +103,7 @@ typedef struct _MultitouchDisplay
     lo_server_thread st;
     mtblob blob[MAXBLOBS];
     mtcolor color;
+    mtclick click[MAXBLOBS];
     CompTimeoutHandle timeoutHandles;
     CompTimeoutHandle clickTimeoutHandle;
 } MultitouchDisplay;
@@ -605,6 +617,54 @@ isMemberOfSet (int *Set, int size, int value)
     return 0;
 }
 
+static Bool
+click_handler (void *data)
+{
+    ClickValue *cv = (ClickValue *) data;
+    MULTITOUCH_DISPLAY (cv->display);
+    mtclick *clicks = md->click;
+    CompScreen *s;
+    s = findScreenAtDisplay (cv->display, currentRoot);
+    int width = s->width;
+    int height = s->height;
+    int clicked = 0;
+    int j,dx,dy;
+    if (s && clicks[cv->id].id >= 0)
+    {
+        for ( j=0;j<MAXBLOBS; j++)
+        {
+        if (clicks[j].id > 0 )
+        //printf ("DEBUG imamo rb: %d id: %d\n",j,clicks[j].id);
+            if (j != cv->id && clicks[j].id > 0 )
+            {
+                dx = (int) abs(clicks[j].x - clicks[cv->id].x) * width;
+                dy = (int) abs(clicks[j].y - clicks[cv->id].y) * height;
+                if ( ( dx  < 10 ) && ( dy < 10 ) )
+                {
+                    clicked++;
+                    clicks[j].id = -1; //cleaning this click
+                    //printf("DEBUG num: %d\n",clicked);
+                }
+            }
+        }
+        clicks[cv->id].id = -1;
+    }
+    if (clicked == 1)
+        {
+        moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height)
+        mouseClick(1);
+        //printf("DOUBLE CLICK!\n");
+        }
+    if (clicked == 2)
+        {
+        moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height)
+        mouseClick(3);
+        //printf("TRIPLE CLICK!\n");
+        }
+    free (cv);
+    return FALSE;
+}
+
 static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
 {
     MULTITOUCH_DISPLAY (d);
@@ -637,36 +697,36 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
             if (blobs[k].id && blobs[k].id < oldestblob)
                 oldestblob=blobs[k].id;
         }
-        if (oldestblob == blobs[BlobID].id && md->Wm )
-            moveCursorTo(blobs[BlobID].x * s->width,blobs[BlobID].y * s->height); // We are first blob/move the cursor
-        if ( blobs[BlobID].w ) // We have window id attached to blob
-        {
-            for (k=0;k<MAXBLOBS; k++)
-            {
-                multiblobs = FALSE;
-                if ( k != BlobID && blobs[k].w ) // We have multiple blobs per window
-                {
-                    multiblobs = k;
-                    break;
-                }
-            }
-            if (multiblobs && blobs[multiblobs].oldx) // Multiple blobs, do the resizing
-            {
-                CompWindow *  w = (void *) blobs[BlobID].w;
-                int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
-                int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
-                resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
-            }
-            else // Single blob, do just the movement
-            {
-                int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
-                int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
-                if (md->Debug)
-                    printf("movewindow id: %d, x%d , y:%d\n", blobs[BlobID].w, dx,dy );
-                CompWindow *  w = (void *) blobs[BlobID].w;
-                moveWindow(w, dx, dy, TRUE, FALSE);
-            }
-        }
+        //if (oldestblob == blobs[BlobID].id && md->Wm )
+            //moveCursorTo(blobs[BlobID].x * s->width,blobs[BlobID].y * s->height); // We are first blob/move the cursor
+        //if ( blobs[BlobID].w ) // We have window id attached to blob
+        //{
+            //for (k=0;k<MAXBLOBS; k++)
+            //{
+                //multiblobs = FALSE;
+                //if ( k != BlobID && blobs[k].w ) // We have multiple blobs per window
+                //{
+                    //multiblobs = k;
+                    //break;
+                //}
+            //}
+            //if (multiblobs && blobs[multiblobs].oldx) // Multiple blobs, do the resizing
+            //{
+                //CompWindow *  w = (void *) blobs[BlobID].w;
+                //int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
+                //int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
+                //resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
+            //}
+            //else // Single blob, do just the movement
+            //{
+                //int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
+                //int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
+                //if (md->Debug)
+                    //printf("movewindow id: %d, x%d , y:%d\n", blobs[BlobID].w, dx,dy );
+                //CompWindow *  w = (void *) blobs[BlobID].w;
+                //moveWindow(w, dx, dy, TRUE, FALSE);
+            //}
+        //}
         break;
     case EventDown:
         if (md->Wm)
@@ -690,6 +750,19 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
             (*w->screen->windowUngrabNotify)(w);
             syncWindowPosition(w);
         }
+        for (k=0;k<MAXBLOBS; k++)
+        {
+            if ( md->click[k].id == -1 )
+                break;
+        }
+        ClickValue *cv = malloc (sizeof (ClickValue));
+        cv->display = d;
+        cv->id = BlobID;
+        md->click[k].id = blobs[BlobID].id;
+        md->click[k].x = blobs[BlobID].x;
+        md->click[k].y = blobs[BlobID].y;
+        md->clickTimeoutHandle = compAddTimeout (400,click_handler, cv);
+
         blobs[BlobID].id = 0;
         blobs[BlobID].x = 0;
         blobs[BlobID].y = 0;
@@ -797,17 +870,55 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
     mtblob *blobs = md->blob;
     int j,alive[MAXBLOBS];
     int found = 0;
-    if ( !strcmp((char *) argv[0],"set") && argv[1]->i) //bypasing first blob (id 0) as it's giving me headache
+    if ( !strcmp((char *) argv[0],"set") )
     {
         for (j = 0; j < MAXBLOBS; j++)
         {
             /* we are already in the list, so just update x,y (MOVE EVENT) */
             if (blobs[j].id == argv[1]->i)
             {
-                blobs[j].oldx = blobs[j].x; // store old X in blobs[] also
-                blobs[j].oldy = blobs[j].y;
+                if ( !blobs[j].x && !blobs[j].y )
+                {
+                    blobs[j].oldx = argv[2]->f;
+                    blobs[j].oldy = argv[3]->f;
+                }
+                else
+                {
+                    blobs[j].oldx = blobs[j].x; // store old X in blobs[] also
+                    blobs[j].oldy = blobs[j].y;
+                }
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
+        if ( blobs[j].w ) // We have window id attached to blob
+        {
+            int k,multiblobs;
+            for (k=0;k<MAXBLOBS; k++)
+            {
+                multiblobs = FALSE;
+                if ( k != j && blobs[k].w ) // We have multiple blobs per window
+                {
+                    multiblobs = k;
+                    break;
+                }
+            }
+            if (multiblobs && blobs[multiblobs].oldx) // Multiple blobs, do the resizing
+            {
+                CompWindow *  w = (void *) blobs[j].w;
+                int dx = (blobs[j].x - blobs[j].oldx) * s->width;
+                int dy = (blobs[j].y - blobs[j].oldy) * s->height;
+                resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
+            }
+            else // Single blob, do just the movement
+            {
+                int dx = (blobs[j].x - blobs[j].oldx) * s->width;
+                int dy = (blobs[j].y - blobs[j].oldy) * s->height;
+                if (md->Debug)
+                    printf("movewindow id: %d, x%d , y:%d\n", blobs[j].w, dx,dy );
+                CompWindow *  w = (void *) blobs[j].w;
+                moveWindow(w, dx, dy, TRUE, FALSE);
+            }
+        }
+
                 gesture_handler(EventMove, s->display,j);
                 found = 1;
                 break;
@@ -841,7 +952,7 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
     {
         for (j=1;j<argc;j++)
         {
-            alive[j] = argv[j]->i;
+            alive[j-1] = argv[j]->i;
         }
         for (j = 0; j < MAXBLOBS; j++)
         {
@@ -850,7 +961,7 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                 /* check if we have blobs that alive packet doesn't have (TOUCH UP EVENT) */
                 if (!(isMemberOfSet (alive, MAXBLOBS, blobs[j].id)))
                 {
-                    click_handler(EventUp, s->display, j);
+                    gesture_handler(EventUp, s->display, j);
                     break;
                 }
             }
@@ -897,6 +1008,7 @@ multitouchToggleMultitouch (CompDisplay *d,
             md->blob[j].id = 0;
             md->blob[j].w = 0;
             md->blob[j].oldx = 0;
+            md->click[j].id = -1;
         }
         md->st = lo_server_thread_new(md->port, loerror);
         lo_server_thread_add_method(md->st, "/tuio/2Dobj", NULL, tuio2Dobj_handler, d);
@@ -958,6 +1070,7 @@ multitouchFiniScreen (CompPlugin * p, CompScreen * s)
 static Bool
 multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
 {
+    printf("DEBUG");
     /* Generate a Multitouch display */
     MultitouchDisplay *md;
     if (!checkPluginABI ("core", CORE_ABIVERSION))
@@ -998,6 +1111,8 @@ static void
 multitouchFiniDisplay (CompPlugin * p, CompDisplay * d)
 {
     MULTITOUCH_DISPLAY (d);
+    if (md->enabled)
+        lo_server_thread_free(md->st);
     /* Free the private index */
     freeScreenPrivateIndex (d, md->screenPrivateIndex);
     /* Free the pointer */
