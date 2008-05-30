@@ -229,16 +229,16 @@ static void moveCursorTo(int x, int y)
  * @return void
  */
 
-static void mouseClick(int button, CompDisplay * d)
+static void mouseClick(int button)//, CompDisplay * d)
 {
     XEvent event;
-
+    //CompDisplay d = firstDisplay;
     memset(&event, 0x00, sizeof(event));
     event.type = ButtonPress;
     event.xbutton.button = button;
     event.xbutton.same_screen = True;
 
-    XQueryPointer(d->display,currentRoot,
+    XQueryPointer(firstDisplay->display,currentRoot,
                   &event.xbutton.root,
                   &event.xbutton.window,
                   &event.xbutton.x_root,
@@ -252,7 +252,7 @@ static void mouseClick(int button, CompDisplay * d)
     while (event.xbutton.subwindow)
     {
         event.xbutton.window = event.xbutton.subwindow;
-        XQueryPointer(d->display,
+        XQueryPointer(firstDisplay->display,
                       event.xbutton.window,
                       &event.xbutton.root,
                       &event.xbutton.subwindow,
@@ -263,21 +263,21 @@ static void mouseClick(int button, CompDisplay * d)
                       &event.xbutton.state);
     }
 
-    if (XSendEvent(d->display, PointerWindow,
+    if (XSendEvent(firstDisplay->display, PointerWindow,
                    True, 0xfff, &event)==0)
         printf("XSendEvent() error!\n");
 
-    XFlush(d->display);
+    XFlush(firstDisplay->display);
     usleep(100000);
 
     event.type = ButtonRelease;
     event.xbutton.state = 0x100;
 
-    if (XSendEvent(d->display, PointerWindow,
+    if (XSendEvent(firstDisplay->display, PointerWindow,
                    True, 0xfff, &event)==0)
         printf("XSendEvent() error2!\n");
 
-    XFlush(d->display);
+    XFlush(firstDisplay->display);
 }
 
 /*
@@ -651,13 +651,13 @@ click_handler (void *data)
     }
     if (clicked == 1)
         {
-        moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height)
+        moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height);
         mouseClick(1);
         //printf("DOUBLE CLICK!\n");
         }
     if (clicked == 2)
         {
-        moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height)
+        moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height);
         mouseClick(3);
         //printf("TRIPLE CLICK!\n");
         }
