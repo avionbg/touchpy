@@ -81,6 +81,12 @@ typedef struct _ClickValue
     int id;
 } ClickValue;
 
+typedef struct _MvValue
+{
+    CompWindow *  w;
+    int dx,dy;
+} MvValue;
+
 typedef struct _DisplayValue
 {
     CompDisplay *display;
@@ -100,12 +106,15 @@ typedef struct _MultitouchDisplay
     Bool Debug;
     Bool Wm;
     Bool TuioFwd;
+    Bool Cur;
+    int Interval,Threshold;
     lo_server_thread st;
     mtblob blob[MAXBLOBS];
     mtcolor color;
     mtclick click[MAXBLOBS];
     CompTimeoutHandle timeoutHandles;
     CompTimeoutHandle clickTimeoutHandle;
+    CompTimeoutHandle moveWindowHandle;
 } MultitouchDisplay;
 
 typedef struct _MultitouchScreen
@@ -371,10 +380,19 @@ multitouchToggleDebug (CompDisplay *d,
                        CompActionState state, CompOption * option, int nOption)
 {
     MULTITOUCH_DISPLAY(d);
-    md->Debug = !md->Debug;
-    if (md->Debug)
-        printf ("Debug enabled\n");
-    else printf ("Debug disabled\n");
+    //md->Debug = !md->Debug;
+    //if (md->Debug)
+        //printf ("Debug enabled\n");
+    //else printf ("Debug disabled\n");
+        int i;
+        mtblob *blobs = md->blob;
+        for (i=0;i<MAXBLOBS; i++)
+        {
+            if ( blobs[i].w )   // cleaning window id from blobs
+                printf("wind %d -> ",blobs[i].w);
+            if ( blobs[i].x)
+                printf ("num: %d blob id: %d\n",i,blobs[i].id);
+        }
     return FALSE;
 }
 
@@ -399,6 +417,20 @@ multitouchToggleWm (CompDisplay *d,
                 blobs[i].w = 0;
         }
     }
+    return FALSE;
+}
+
+static Bool
+multitouchToggleCur (CompDisplay *d,
+                    CompAction * action,
+                    CompActionState state, CompOption * option, int nOption)
+{
+    MULTITOUCH_DISPLAY(d);
+    md->Cur = !md->Cur;
+    if (md->Debug && md->Cur)
+        printf ("Mouse emulation enabled\n");
+    else if (md->Debug)
+            printf ("Mouse emulation disabled\n");
     return FALSE;
 }
 
@@ -596,6 +628,15 @@ displaytext (void *data)
     return FALSE;
 }
 
+static Bool
+moveWindow_handler (void *data)
+{
+    MvValue *mv = (MvValue *) data;
+    moveWindow(mv->w, mv->dx, mv->dy, TRUE, FALSE);
+    free (mv);
+    return FALSE;
+}
+
 /*
  * Check if a value is part of set
  * name: isMemberOfSet
@@ -628,22 +669,26 @@ click_handler (void *data)
     int width = s->width;
     int height = s->height;
     int clicked = 0;
-    int j,dx,dy;
+    int j,dy,dx;
     if (s && clicks[cv->id].id >= 0)
     {
         for ( j=0;j<MAXBLOBS; j++)
         {
+            //printf("j %d cv %d j.id %d j.x %f\n",j,cv->id,clicks[j].id,clicks[j].x);
         if (clicks[j].id > 0 )
-        //printf ("DEBUG imamo rb: %d id: %d\n",j,clicks[j].id);
-            if (j != cv->id && clicks[j].id > 0 )
+        //printf ("DEBUG rb: %d id: %d\n",j,clicks[j].id);
+            if (j != cv->id )
             {
-                dx = (int) abs(clicks[j].x - clicks[cv->id].x) * width;
-                dy = (int) abs(clicks[j].y - clicks[cv->id].y) * height;
-                if ( ( dx  < 10 ) && ( dy < 10 ) )
+                //dx = (clicks[j].x - clicks[cv->id].x) * width;
+                dx = abs((int) ((clicks[j].x - clicks[cv->id].x) * width));
+                //printf("dx %d %d", abs((int) dx), proba);
+                dy = abs ((int) ((clicks[j].y - clicks[cv->id].y) * height));
+                //printf("id:%d j:%d dx:%d dy:%dy x:%f x-cv:%f\n",cv->id,j,dx,dy,clicks[j].x ,clicks[cv->id].x);
+                if ( ( dx  < md->Threshold ) && ( dy < md->Threshold ) )
                 {
                     clicked++;
                     clicks[j].id = -1; //cleaning this click
-                    //printf("DEBUG num: %d\n",clicked);
+                    printf("DEBUG num: %d interval: %d threshold: %d\n",clicked,md->Interval,md->Threshold);
                 }
             }
         }
@@ -653,13 +698,13 @@ click_handler (void *data)
         {
         moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height);
         mouseClick(1);
-        //printf("DOUBLE CLICK!\n");
+        printf("DOUBLE CLICK!\n");
         }
     if (clicked == 2)
         {
         moveCursorTo(clicks[cv->id].x * width, clicks[cv->id].y * height);
         mouseClick(3);
-        //printf("TRIPLE CLICK!\n");
+        printf("TRIPLE CLICK!\n");
         }
     free (cv);
     return FALSE;
@@ -697,36 +742,42 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
             if (blobs[k].id && blobs[k].id < oldestblob)
                 oldestblob=blobs[k].id;
         }
-        //if (oldestblob == blobs[BlobID].id && md->Wm )
-            //moveCursorTo(blobs[BlobID].x * s->width,blobs[BlobID].y * s->height); // We are first blob/move the cursor
-        //if ( blobs[BlobID].w ) // We have window id attached to blob
-        //{
-            //for (k=0;k<MAXBLOBS; k++)
-            //{
-                //multiblobs = FALSE;
-                //if ( k != BlobID && blobs[k].w ) // We have multiple blobs per window
-                //{
-                    //multiblobs = k;
-                    //break;
-                //}
-            //}
-            //if (multiblobs && blobs[multiblobs].oldx) // Multiple blobs, do the resizing
-            //{
-                //CompWindow *  w = (void *) blobs[BlobID].w;
-                //int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
-                //int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
-                //resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
-            //}
-            //else // Single blob, do just the movement
-            //{
-                //int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
-                //int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
-                //if (md->Debug)
-                    //printf("movewindow id: %d, x%d , y:%d\n", blobs[BlobID].w, dx,dy );
-                //CompWindow *  w = (void *) blobs[BlobID].w;
+        if (oldestblob == blobs[BlobID].id && md->Cur )
+            moveCursorTo(blobs[BlobID].x * s->width,blobs[BlobID].y * s->height); // We are first blob/move the cursor
+        if ( blobs[BlobID].w ) // We have window id attached to blob
+        {
+            for (k=0;k<MAXBLOBS; k++)
+            {
+                multiblobs = FALSE;
+                if ( k != BlobID && blobs[k].w ) // We have multiple blobs per window
+                {
+                    multiblobs = k;
+                    break;
+                }
+            }
+            if (multiblobs && blobs[multiblobs].oldx) // Multiple blobs, do the resizing
+            {
+                CompWindow *  w = (void *) blobs[BlobID].w;
+                int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
+                int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
+                resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
+            }
+            else // Single blob, do just the movement
+            {
+                int dx = (blobs[BlobID].x - blobs[BlobID].oldx) * s->width;
+                int dy = (blobs[BlobID].y - blobs[BlobID].oldy) * s->height;
+                if (md->Debug)
+                    printf("movewindow id: %d, x%d , y:%d\n", blobs[BlobID].w, dx,dy );
+                CompWindow *  w = (void *) blobs[BlobID].w;
+                MvValue *mv = malloc (sizeof (MvValue));
+                //mv->display = d;
+                mv->w = w;
+                mv->dx = dx;
+                mv->dy = dy;
                 //moveWindow(w, dx, dy, TRUE, FALSE);
-            //}
-        //}
+                md->moveWindowHandle = compAddTimeout (0, moveWindow_handler, mv);
+            }
+        }
         break;
     case EventDown:
         if (md->Wm)
@@ -757,11 +808,12 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
         }
         ClickValue *cv = malloc (sizeof (ClickValue));
         cv->display = d;
-        cv->id = BlobID;
+        cv->id = k;//blobs[BlobID].id;
+        printf ("k %d\n",k);
         md->click[k].id = blobs[BlobID].id;
         md->click[k].x = blobs[BlobID].x;
         md->click[k].y = blobs[BlobID].y;
-        md->clickTimeoutHandle = compAddTimeout (400,click_handler, cv);
+        md->clickTimeoutHandle = compAddTimeout (md->Interval,click_handler, cv);
 
         blobs[BlobID].id = 0;
         blobs[BlobID].x = 0;
@@ -875,7 +927,7 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
         for (j = 0; j < MAXBLOBS; j++)
         {
             /* we are already in the list, so just update x,y (MOVE EVENT) */
-            if (blobs[j].id == argv[1]->i)
+            if (blobs[j].id == argv[1]->i && blobs[j].x)
             {
                 if ( !blobs[j].x && !blobs[j].y )
                 {
@@ -889,36 +941,6 @@ static int tuio2Dcur_handler(const char *path, const char *types, lo_arg **argv,
                 }
                 blobs[j].x = argv[2]->f;
                 blobs[j].y = argv[3]->f;
-        if ( blobs[j].w ) // We have window id attached to blob
-        {
-            int k,multiblobs;
-            for (k=0;k<MAXBLOBS; k++)
-            {
-                multiblobs = FALSE;
-                if ( k != j && blobs[k].w ) // We have multiple blobs per window
-                {
-                    multiblobs = k;
-                    break;
-                }
-            }
-            if (multiblobs && blobs[multiblobs].oldx) // Multiple blobs, do the resizing
-            {
-                CompWindow *  w = (void *) blobs[j].w;
-                int dx = (blobs[j].x - blobs[j].oldx) * s->width;
-                int dy = (blobs[j].y - blobs[j].oldy) * s->height;
-                resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
-            }
-            else // Single blob, do just the movement
-            {
-                int dx = (blobs[j].x - blobs[j].oldx) * s->width;
-                int dy = (blobs[j].y - blobs[j].oldy) * s->height;
-                if (md->Debug)
-                    printf("movewindow id: %d, x%d , y:%d\n", blobs[j].w, dx,dy );
-                CompWindow *  w = (void *) blobs[j].w;
-                moveWindow(w, dx, dy, TRUE, FALSE);
-            }
-        }
-
                 gesture_handler(EventMove, s->display,j);
                 found = 1;
                 break;
@@ -999,6 +1021,8 @@ multitouchToggleMultitouch (CompDisplay *d,
         sprintf (md->fwdport,"%d",multitouchGetFwdport (d));
         ms->CurrentEffect = multitouchGetEffect(d);
         md->TuioFwd = multitouchGetEnableFwd(d);
+        md->Interval = multitouchGetInterval(d);
+        md->Threshold = multitouchGetThreshold(d);
         md->color.R = fillcolor[0];
         md->color.G = fillcolor[1];
         md->color.B = fillcolor[2];
@@ -1095,6 +1119,7 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
     md->TuioFwd = multitouchGetEnableFwd(d);
     md->enabled = FALSE;
     md->Debug = TRUE;
+    md->Cur = FALSE;
     md->Wm = FALSE;
     //sprintf (port,"%d",multitouchGetPort (d));
     //md->TuioFwd = multitouchGetEnableFwd(d);
@@ -1103,6 +1128,7 @@ multitouchInitDisplay (CompPlugin * p, CompDisplay * d)
     multitouchSetToggleDebugInitiate (d, multitouchToggleDebug);
     multitouchSetToggleFwdInitiate (d, multitouchToggleFwd);
     multitouchSetToggleWmInitiate (d, multitouchToggleWm);
+    multitouchSetToggleCurInitiate (d, multitouchToggleCur);
     multitouchSetToggleEffectsInitiate (d, multitouchToggleEffects);
     return TRUE;
 }

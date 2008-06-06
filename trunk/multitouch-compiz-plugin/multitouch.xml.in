@@ -14,6 +14,8 @@
 		<long>Use multitouch screens trough tuio protocol to drive various plugins</long>
 		<category>Accessibility</category>
 		<display>
+		<group>
+		<short>Keys</short>
 			<short>Key Bindings</short>
 			<option name="toggle_multitouch" type="key">
 				<short>Toggle the plugin</short>
@@ -32,14 +34,22 @@
 			</option>
 			<option name="toggle_wm" type="key">
 				<short>Toggle gestures</short>
-				<long>Toggle mouse emulation,moving and resizing windows.</long>
+				<long>Toggle moving and resizing windows.</long>
 				<default>&lt;Super&gt;F11</default>
+			</option>
+			<option name="toggle_cur" type="key">
+				<short>Toggle cursor</short>
+				<long>Toggle mouse cursor emulation.</long>
+				<default>&lt;Super&gt;F7</default>
 			</option>
 			<option name="toggle_effects" type="key">
 				<short>Switch effects</short>
 				<long>Switch from annotate to water wave or disable effects.</long>
 				<default>&lt;Super&gt;F12</default>
 			</option>
+		</group>
+		<group>
+		<short>Other</short>
 			<option name="effect" type="int">
 				<short>Choose effect</short>
 				<long>Choose ripples or annotate on the screen.</long>
@@ -81,8 +91,29 @@
 					<max>65535</max>
 				</option>
 			</subgroup>
+			<subgroup>
+				<short>Mouse emulation</short>
+				<long>Mouse interval and threshold values.</long>
+				<option name="interval" type="int">
+					<short>Mouse double/tripple click interval</short>
+					<long>Maximal time (in milliseconds) between 2 or 3 mouse clicks that turns them into double/tripple click.</long>
+					<default>400</default>
+					<min>200</min>
+					<max>1000</max>
+				</option>
+				<option name="threshold" type="int">
+				<short>Pointer threshold</short>
+				<long>Smallest distance (in pixels) that the mouse pointer can move when performing double/tripple click to be recognized as such.</long>
+					<default>10</default>
+					<min>1</min>
+					<max>100</max>
+				</option>
+			</subgroup>
+			</group>
 		</display>
 		<screen>
+		<group>
+		<short>Other</short>
 			<subgroup>
 				<short>Annotate related settings</short>
 				<option type="color" name="fill_color">
@@ -93,6 +124,7 @@
 					</default>
 				</option>
 			</subgroup>
+		</group>
 		</screen>
 	</plugin>
 </compiz>
