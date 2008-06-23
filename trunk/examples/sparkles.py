@@ -106,6 +106,12 @@ while not pygame.event.get(pygame.QUIT):
         #print "FPS: ", c.get_fps()
         last_fps = pygame.time.get_ticks()
         #print len(sprites)
+	#This is needed to have constant particles when holding finger on surface
+    for blob in t.blobs:
+		x = int(t.blobs[blob].xpos*480 -320)
+		y = int(240 - t.blobs[blob].ypos *640)
+		fire((x,y))
+
     rabbyt.scheduler.pump()
     rabbyt.clear()
     rabbyt.set_time(pygame.time.get_ticks())
