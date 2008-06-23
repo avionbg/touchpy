@@ -1,8 +1,8 @@
 #!/usr/bin/python -u
 """
-Example of moving the windows with touchpy
+Simple printing of touch events
 """
-from touch import touchlib
+from touch import *
 import wmxlibutil
 
 class Observer(object):
@@ -10,32 +10,31 @@ class Observer(object):
 		subject.push_handlers(self)
 
 class touch_up(Observer):
-	def on_touchup(self,blobID, xpos, ypos):
+	def TOUCH_UP(self,blobID, xpos, ypos):
 		if DEBUG: print 'blob release detected: ', blobID, xpos, ypos
 		pass
 
 class touch_down(Observer):
-	def on_touchdown(self,blobID):
-		if DEBUG: print 'blob press detected: ', blobID.sessionid, blobID.xpos, blobID.ypos
+	def TOUCH_DOWN(self,blobID):
+		if DEBUG: print 'blob press detected: ', blobID, t.blobs[blobID].xpos, t.blobs[blobID].ypos
 		pass
 
 class touch_move(Observer):
-	def on_touchmove(self,blobID):
-		if DEBUG: print 'blob move detected: ', blobID.sessionid, blobID.xpos, blobID.ypos
+	def TOUCH_MOVE(self,blobID):
+		if DEBUG: print 'blob move detected: ', blobID, t.blobs[blobID].xpos, t.blobs[blobID].ypos
 		pass
 
 (width,height) = wmxlibutil.getdisplaysize()
 
-t = touchlib()
+t = touchpy()
 tu = touch_up(t)
 td = touch_down(t)
 tm = touch_move(t)
-windows = {}
-wid = {}
-DEBUG = 0
+DEBUG = 1
+
 try:
 	while True:
-		t.dispatch_events()
+		t.update()
 
 except (KeyboardInterrupt, SystemExit):
-	t.stop()
+	del t

@@ -1,6 +1,6 @@
 #!/usr/bin/python -u
 #import wutil
-from touch import touchlib
+from touch import *
 
 #try:
 import xutil
