@@ -61,7 +61,7 @@ class touchpy(event.EventDispatcher):
 		elif args[0] == 'fseq':
 			self.last_frame = self.current_frame
 			self.current_frame = args[1]
-			print 'fseq',self.current_frame
+			#print 'fseq',self.current_frame
 
 	def TOUCH_DOWN(self, blobID):
 		pass

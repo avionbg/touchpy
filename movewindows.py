@@ -2,7 +2,7 @@
 """
 Example of moving the windows with touchpy
 """
-from touch import touchlib
+from touch import *
 import wmxlibutil
 
 class Window(object):
@@ -25,8 +25,8 @@ class Observer(object):
 	def __init__(self, subject):
 		subject.push_handlers(self)
 
-class touch_up(Observer):
-	def on_touchup(self,blobID, xpos, ypos):
+class TOUCH_UP(Observer):
+	def TOUCH_UP(self,blobID, xpos, ypos):
 		if DEBUG: print 'blob release detected: ', blobID, xpos, ypos
 		for window in wid:
 			if DEBUG: print window,wid[window].ID,blobID
@@ -35,33 +35,33 @@ class touch_up(Observer):
 				break
 		pass
 
-class touch_down(Observer):
-	def on_touchdown(self,blobID):
-		w_id = wmxlibutil.pointer2wid(int(blobID.xpos*width),int(blobID.ypos*height))
-		wid[w_id] = Window(blobID.sessionid,w_id)
-		if DEBUG: print 'blob press detected: ', blobID.sessionid, blobID.xpos, blobID.ypos
+class TOUCH_DOWN(Observer):
+	def TOUCH_DOWN(self,blobID):
+		w_id = wmxlibutil.pointer2wid(int(t.blobs[blobID].xpos*width),int(t.blobs[blobID].ypos*height))
+		wid[w_id] = Window(blobID,w_id)
+		if DEBUG: print 'blob press detected: ', blobID, t.blobs[blobID].xpos, t.blobs[blobID].ypos
 		pass
 
-class touch_move(Observer):
-	def on_touchmove(self,blobID):
-		if DEBUG: print 'blob move detected: ', blobID.sessionid, blobID.xpos, blobID.ypos
+class TOUCH_MOVE(Observer):
+	def TOUCH_MOVE(self,blobID):
+		if DEBUG: print 'blob move detected: ', blobID, t.blobs[blobID].xpos, t.blobs[blobID].ypos
 		for window in wid:
-			if wid[window].ID == blobID.sessionid:
-				wmxlibutil.window_xmove (window,int(blobID.xpos * width), int(blobID.ypos *height))
+			if wid[window].ID == blobID:
+				wmxlibutil.window_move (window,int(t.blobs[blobID].xpos * width), int(t.blobs[blobID].ypos *height))
 		pass
 
 (width,height) = wmxlibutil.getdisplaysize()
 
-t = touchlib()
-tu = touch_up(t)
-td = touch_down(t)
-tm = touch_move(t)
+t = touchpy()
+tu = TOUCH_UP(t)
+td = TOUCH_DOWN(t)
+tm = TOUCH_MOVE(t)
 windows = {}
 wid = {}
 DEBUG = 1
 try:
 	while True:
-		t.dispatch_events()
+		t.update()
 
 except (KeyboardInterrupt, SystemExit):
-	t.stop()
+	del t
