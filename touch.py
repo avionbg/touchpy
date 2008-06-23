@@ -1,106 +1,103 @@
 #!/usr/bin/python -u
 # coding: utf-8
 
-import tuio
-import os, time
+#import os, time
+import event
+import liblo
 import sets
-from pyglet import event
-import copy
+import sys
 
 def intersection(set1,set2): return filter(lambda s:s in set2,set1)
 
 def difference(set1,set2): return filter(lambda s:s not in set2,set1)
 
-class touchlib(event.EventDispatcher):
-	def __init__(self, host='127.0.0.1', port=3333):
-		global tracking,old_blobs,new_blobs,old_tobje
-		self.host = host
-		self.port = port
-		self.old_blobs = []
-		self.new_blobs = []
-		old_tobje = {}
-		#try:
-		tracking = tuio.Tracking(host=self.host, port=self.port)
-		#except (KeyboardInterrupt, SystemExit):
-			#tracking.stop()
-	def stop(self):
-		tracking.stop()
-
-	def dispatch_events(self):
-		global old_tobje
-		tracking.update()
-		self.new_blobs = tracking.profiles['/tuio/2Dcur'].sessions
-		if self.new_blobs != self.old_blobs:
-			touch_release = difference(self.old_blobs,self.new_blobs)
-			touch_down = difference(self.new_blobs,self.old_blobs)
-			touch_move = intersection(self.old_blobs,self.new_blobs)
-			if touch_release:
-				for blobID in touch_release:
-					self.dispatch_event('on_touchup', blobID, old_tobje[blobID].xpos, old_tobje[blobID].ypos)
-					del old_tobje[blobID]
-			if touch_down:
-				for blobID in touch_down:
-					tobje = tracking.profiles['/tuio/2Dcur'].objects[blobID]
-					self.dispatch_event('on_touchdown', tobje )
-					old_tobje[blobID] = copy.copy(tobje)
-			if touch_move:
-				for blobID in touch_move:
-					tobject = tracking.profiles['/tuio/2Dcur'].objects[blobID]
-					self.dispatch_event('on_touchmove', tobject)
-			self.old_blobs = self.new_blobs
+class Tuio2DCursor(event.EventDispatcher):
+	def __init__(self, blobID,args):
+		self.blobID = blobID
+		self.oxpos = self.oypos = 0.0
+		if len(args) == 5:
+			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
 		else:
-			for blobID in self.new_blobs:
-				tobje = tracking.profiles['/tuio/2Dcur'].objects[blobID]
-				if ( (old_tobje[blobID].xpos != tobje.xpos) and (old_tobje[blobID].ypos != tobje.ypos) ):
-					self.dispatch_event('on_touchmove', tobje)
-					old_tobje[blobID] = copy.copy(tobje)
-	def on_touchdown(self, tobject):
+			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
+
+	def move(self, args):
+		self.oxpos, self.oypos = self.xpos, self.ypos
+		if len(args) == 5:
+			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
+		else:
+			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
+
+class touchpy(event.EventDispatcher):
+	def __init__(self, port=3333):
+		self.current_frame = self.last_frame = 0
+		self.alive = []
+		self.blobs = {}
+		try:
+			self.server = liblo.Server(port)
+		except liblo.ServerError, err:
+			sys.exit(str(err))
+		self.server.add_method("/tuio/2Dcur", None, self.handle2Dcur)
+
+	def handle2Dcur(self, path, args, types, src):
+		if args[0] == 'alive':
+			touch_release = difference(self.alive,args[1:])
+			touch_down = difference(self.alive,args[1:])
+			touch_move = intersection(self.alive,args[1:])
+			self.alive = args[1:]
+			for blobID in touch_release:
+				self.dispatch_event('TOUCH_UP', blobID, self.blobs[blobID].xpos, self.blobs[blobID].ypos)
+				del self.blobs[blobID]
+
+		elif args[0] == 'set':
+			blobID = args[1]
+			if blobID not in self.blobs:
+				self.blobs[blobID] = Tuio2DCursor(blobID,args[2:])
+				#self.blobs[blobID].update(args[2:])
+				self.dispatch_event('TOUCH_DOWN', blobID)
+			else:
+				self.blobs[blobID].move(args[2:])
+				self.dispatch_event('TOUCH_MOVE', blobID)
+
+		elif args[0] == 'fseq':
+			self.last_frame = self.current_frame
+			self.current_frame = args[1]
+			print 'fseq',self.current_frame
+
+	def TOUCH_DOWN(self, blobID):
 		pass
 
-	def on_touchup(self, blobID, xpos, ypos):
+	def TOUCH_UP(self, blobID, x, y):
 		pass
 
-	def on_touchmove(self, tobject):
+	def TOUCH_MOVE(self, blobID):
 		pass
 
-touchlib.register_event_type('on_touchdown')
-touchlib.register_event_type('on_touchup')
-touchlib.register_event_type('on_touchmove')
+	def update(self):
+		#while True:
+			self.server.recv(0)
 
-class Observer(object):
-    def __init__(self, subject):
-        subject.push_handlers(self)
+touchpy.register_event_type('TOUCH_DOWN')
+touchpy.register_event_type('TOUCH_UP')
+touchpy.register_event_type('TOUCH_MOVE')
 
-# Concrete observer
-class tdown(Observer):
-    def on_touchup(self,blobID, xpos, ypos):
-	print 'blob release detected: ', blobID, xpos, ypos
-	pass
+if __name__ == '__main__':
+	t = touchpy()
+	@t.event
+	def TOUCH_DOWN(blobID):
+		print 'blob press detected: ', blobID, t.blobs[blobID].xpos, t.blobs[blobID].ypos
 
+	@t.event
+	def TOUCH_UP(blobID,x,y):
+		print 'blob release detected: ', blobID, x, y
 
-#if __name__ == "__main__":
-	#t = touchlib()
-	#import wutil
-	#DEBUG = 0
-	#td = tdown(t)
-	#print wutil.pointer2wid(200,200)
-	
-	#def movewin(x,y):
-		##wutil.window_move(67108915,x,y)
-		#print wutil.getWindowUnderCursor()
+	@t.event
+	def TOUCH_MOVE(blobID):
+		print 'blob move detected: ', blobID, t.blobs[blobID].xpos, t.blobs[blobID].ypos
+	try:
+		while True:
+			t.update()
+			#for obj in t.blobs:
+				#print t.blobs[obj].blobID, t.blobs[obj].xpos, t.blobs[obj].ypos
 
-	#while True:
-		#t.dispatch_events()
-	#@t.event
-	#def on_touchdown(tobject):
-		#if DEBUG: print 'blob press detected: ', tobject.sessionid, tobject.xpos, tobject.ypos
-
-	#@t.event
-	#def on_touchup(blobID, xpos, ypos):
-		#if DEBUG: print 'blob release detected: ', blobID, xpos, ypos
-
-	#@t.event
-	#def on_touchmove(tobject):
-		#if DEBUG: print 'blob move detected: ', tobject.sessionid, tobject.xpos, tobject.ypos
-		#movewin (int(tobject.xpos * 1650), int(tobject.ypos *1050))
-
+	except KeyboardInterrupt:
+		del t
