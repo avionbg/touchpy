@@ -11,13 +11,13 @@ def intersection(set1,set2): return filter(lambda s:s in set2,set1)
 def difference(set1,set2): return filter(lambda s:s not in set2,set1)
 
 def test_import (module) :
-    try :
-        exec('import %s' % module)
-        exec('del %s' % module)
-    except ImportError :
-        return False
-    else :
-        return True
+	try :
+		exec('import %s' % module)
+		exec('del %s' % module)
+	except ImportError :
+		return False
+	else :
+		return True
 
 class Tuio2DCursor(event.EventDispatcher):
 	def __init__(self, blobID,args):
@@ -41,13 +41,13 @@ class touchpy(event.EventDispatcher):
 		self.alive = []
 		self.blobs = {}
 
-                if test_import('liblo'):
-                    from llo import LibloParser
-                    self.parser = LibloParser(self.handle2Dcur)
-        
-                else:
-                    from raw import RawParser
-                    self.parser = RawParser(self.handle2Dcur)
+		if test_import('liblo'):
+			from llo import LibloParser
+			self.parser = LibloParser(self.handle2Dcur)
+
+		else:
+			from raw import RawParser
+			self.parser = RawParser(self.handle2Dcur)
 
 	def handle2Dcur(self, path, args, types, src):
 		if args[0] == 'alive':
@@ -76,7 +76,7 @@ class touchpy(event.EventDispatcher):
 			#print 'fseq',self.current_frame
 
 	def update(self):
-	    self.parser.update()
+		self.parser.update()
 
 	def TOUCH_DOWN(self, blobID):
 		pass
@@ -112,7 +112,7 @@ if __name__ == '__main__':
 		while True:
 			t.update()
 			#for obj in t.blobs:
-				#print t.blobs[obj].blobID, t.blobs[obj].xpos, t.blobs[obj].ypos
+					#print t.blobs[obj].blobID, t.blobs[obj].xpos, t.blobs[obj].ypos
 
 	except KeyboardInterrupt:
 		del t
