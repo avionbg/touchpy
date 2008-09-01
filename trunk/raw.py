@@ -23,5 +23,5 @@ class RawParser(object):
         except socket.error:
             pass
 
-    def close_socket(self):
+    def __del__(self):
         self.socket.close()
