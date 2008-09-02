@@ -19,7 +19,7 @@ def test_import (module) :
 	else :
 		return True
 
-class Tuio2DCursor(event.EventDispatcher):
+class Generic2DCursor(event.EventDispatcher):
 	def __init__(self, blobID,args):
 		self.blobID = blobID
 		self.oxpos = self.oypos = 0.0
@@ -35,19 +35,52 @@ class Tuio2DCursor(event.EventDispatcher):
 		else:
 			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
 
+class Touch2DCursor(event.EventDispatcher):
+	def __init__(self, blobID,args):
+		self.blobID = blobID
+		self.oxpos = self.oypos = 0.0
+		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
+
+	def move(self, args):
+		self.oxpos, self.oypos = self.xpos, self.ypos
+		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
+
+class Simul2DCursor(event.EventDispatcher):
+	def __init__(self, blobID,args):
+		self.blobID = blobID
+		self.oxpos = self.oypos = 0.0
+		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
+
+	def move(self, args):
+		self.oxpos, self.oypos = self.xpos, self.ypos
+		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
+
 class touchpy(event.EventDispatcher):
 	def __init__(self, host='127.0.0.1', port=3333):
 		self.current_frame = self.last_frame = 0
+		self.cursorparser = Generic2DCursor
 		self.alive = []
 		self.blobs = {}
 
 		if test_import('liblo'):
 			from llo import LibloParser
-			self.parser = LibloParser(self.handle2Dcur)
+			self.parser = LibloParser(self.setup)
 
 		else:
 			from raw import RawParser
-			self.parser = RawParser(self.handle2Dcur)
+			self.parser = RawParser(self.setup)
+
+	def setup(self, path, args, types, src):
+		if args[0] == 'set':
+			if len(args[2:]) == 5:
+				self.cursorparser = Simul2DCursor
+				self.provider = 'TUIOSimulator'
+			else:
+				self.cursorparser = Touch2DCursor
+				self.provider = 'Touchlib'
+		elif args[0] == 'fseq' and hasattr(self, 'provider'):
+			self.parser.subst(self.handle2Dcur)
+		self.handle2Dcur(path, args, types, src)
 
 	def handle2Dcur(self, path, args, types, src):
 		if args[0] == 'alive':
@@ -62,8 +95,7 @@ class touchpy(event.EventDispatcher):
 		elif args[0] == 'set':
 			blobID = args[1]
 			if blobID not in self.blobs:
-				self.blobs[blobID] = Tuio2DCursor(blobID,args[2:])
-				#self.blobs[blobID].update(args[2:])
+				self.blobs[blobID] = self.cursorparser(blobID,args[2:])
 				self.dispatch_event('TOUCH_DOWN', blobID)
 			else:
 				self.blobs[blobID].move(args[2:])
@@ -73,7 +105,6 @@ class touchpy(event.EventDispatcher):
 			self.last_frame = self.current_frame
 			self.current_frame = args[1]
 			self.dispatch_event('FSEQ', self.current_frame)
-			#print 'fseq',self.current_frame
 
 	def update(self):
 		self.parser.update()
