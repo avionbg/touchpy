@@ -2,6 +2,7 @@ import OSC,socket
 
 class RawParser(object):
 	def __init__(self, callback, host='127.0.0.1', port=3333, address = "/tuio/2Dcur"):
+		self.address = address
 		self.callback = callback
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -15,6 +16,9 @@ class RawParser(object):
 		path, types, args = message[0], message[1], message[2:]
 		if (path == self.address):
 			self.callback(path,args,types,"raw")
+
+	def subst(self, callback):
+		self.callback = callback
 
 	def update(self):
 		try:
