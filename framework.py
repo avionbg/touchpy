@@ -14,7 +14,7 @@ def contains(obj, x, y):
 class touchframework (touchpy):
 	def __init__(self, host='127.0.0.1', port=3333, width=0, height=0):
 		super(touchframework,self).__init__( host, port)
-		self.things = {}
+		self.sprites = {}
 		pygame.init()    
 		self.clock = pygame.time.Clock()
 		if width == 0:
@@ -29,11 +29,11 @@ class touchframework (touchpy):
 		self.screen = pygame.display.set_mode((self.width, self.height),1)
 		pygame.display.set_caption('Touchpy V2 is becoming real multimedia framework!')        
 
-	def register(self, thing):
-		if thing == None:
-			del self.things[thing]
+	def register(self, sprite):
+		if sprite == None:
+			del self.sprites[sprite]
 		else:
-			self.things[thing] = thing
+			self.sprites[sprite] = sprite
 
 	def setup(self, path, args, types, src):
 		if args[0] == 'set':
@@ -47,11 +47,11 @@ class touchframework (touchpy):
 			self.parser.subst(self.handle2Dcur)
 		self.handle2Dcur(path, args, types, src)
 
-	def test_under (self,blobId,things):
-		for thing in things:
-			if contains(thing,x, y):
+	def test_under (self,blobId,sprites):
+		for sprite in sprites:
+			if contains(sprite,x, y):
 				blobId.attach(thing)
-				self.things[thing].touchdown()
+				self.sprites[sprite].touchdown()
 
 	def handle2Dcur(self, path, args, types, src):
 		if args[0] == 'alive':
@@ -79,7 +79,7 @@ class touchframework (touchpy):
 
 	def update(self):
 		self.parser.update()
-		clock.tick(30)
+		self.clock.tick(30)
 		ticks = pygame.time.get_ticks()        
 		time = pygame.time.get_ticks()-ticks
 		pygame.display.flip()
