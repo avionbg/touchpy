@@ -10,7 +10,7 @@ def intersection(set1,set2): return filter(lambda s:s in set2,set1)
 
 def difference(set1,set2): return filter(lambda s:s not in set2,set1)
 
-def test_import (module) :
+def test_import (module):
 	try :
 		exec('import %s' % module)
 		exec('del %s' % module)
@@ -48,6 +48,7 @@ class Touch2DCursor(event.EventDispatcher):
 class Simul2DCursor(event.EventDispatcher):
 	def __init__(self, blobID,args):
 		self.blobID = blobID
+		self.thing = None
 		self.oxpos = self.oypos = 0.0
 		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
 
@@ -55,12 +56,16 @@ class Simul2DCursor(event.EventDispatcher):
 		self.oxpos, self.oypos = self.xpos, self.ypos
 		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
 
+	def attach(self, thing):
+		self.thing = thing
+
 class touchpy(event.EventDispatcher):
 	def __init__(self, host='127.0.0.1', port=3333):
 		self.current_frame = self.last_frame = 0
 		self.cursorparser = Generic2DCursor
 		self.alive = []
 		self.blobs = {}
+		self.things = {}
 
 		if test_import('liblo'):
 			from llo import LibloParser
@@ -85,8 +90,8 @@ class touchpy(event.EventDispatcher):
 	def handle2Dcur(self, path, args, types, src):
 		if args[0] == 'alive':
 			touch_release = difference(self.alive,args[1:])
-			touch_down = difference(self.alive,args[1:])
-			touch_move = intersection(self.alive,args[1:])
+			#touch_down = difference(self.alive,args[1:])
+			#touch_move = intersection(self.alive,args[1:])
 			self.alive = args[1:]
 			for blobID in touch_release:
 				self.dispatch_event('TOUCH_UP', blobID, self.blobs[blobID].xpos, self.blobs[blobID].ypos)
