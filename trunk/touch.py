@@ -1,10 +1,8 @@
 #!/usr/bin/python -u
 # coding: utf-8
 
-#import os, time
-import event
 import sets
-import sys
+from cursors import *
 
 def intersection(set1,set2): return filter(lambda s:s in set2,set1)
 
@@ -19,53 +17,12 @@ def test_import (module):
 	else :
 		return True
 
-class Generic2DCursor(event.EventDispatcher):
-	def __init__(self, blobID,args):
-		self.blobID = blobID
-		self.oxpos = self.oypos = 0.0
-		if len(args) == 5:
-			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
-		else:
-			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
-
-	def move(self, args):
-		self.oxpos, self.oypos = self.xpos, self.ypos
-		if len(args) == 5:
-			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
-		else:
-			self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
-
-class Touch2DCursor(event.EventDispatcher):
-	def __init__(self, blobID,args):
-		self.blobID = blobID
-		self.oxpos = self.oypos = 0.0
-		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
-
-	def move(self, args):
-		self.oxpos, self.oypos = self.xpos, self.ypos
-		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
-
-class Simul2DCursor(event.EventDispatcher):
-	def __init__(self, blobID,args):
-		self.blobID = blobID
-		self.thing = None
-		self.oxpos = self.oypos = 0.0
-		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
-
-	def move(self, args):
-		self.oxpos, self.oypos = self.xpos, self.ypos
-		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel = args[0:5]
-
-	def attach(self, thing):
-		self.thing = thing
-
 class touchpy(event.EventDispatcher):
 	def __init__(self, host='127.0.0.1', port=3333):
 		self.current_frame = self.last_frame = 0
 		self.cursorparser = Generic2DCursor
 		self.alive = []
 		self.blobs = {}
-		self.things = {}
 
 		if test_import('liblo'):
 			from llo import LibloParser
