@@ -9,12 +9,7 @@ from framework import *
 
 def main():
 	# init pygame
-	pygame.init()    
-	clock = pygame.time.Clock()
-
-	# setup the display
-	screen = pygame.display.set_mode((600, 600),1)
-	pygame.display.set_caption('Touchpy V2 is becoming real multimedia framework!')        
+	t = touchframework(None,None,800,600)
 
 	img = pygame.Surface([40,40])
 	img = img.convert()
@@ -30,15 +25,13 @@ def main():
 	# you can use either array_colorkey() or array_alpha() as hitmask
 	hero.hitmask = pygame.surfarray.array_colorkey(img)
 	hero_group = pygame.sprite.RenderPlain(hero)
-	hero.touchdown = pp
-	hero.touchmove = pp
-	hero.touchup = pp
-	t = touchframework()
+	# hero.touchdown = pp
+	# hero.touchmove = pp
+	# hero.touchup = pp
 	t.register(hero)
 
 	try:
 		while True:
-			clock.tick(30)        
 			for event in pygame.event.get():
 				if event.type == QUIT:
 					del t
@@ -49,11 +42,8 @@ def main():
 						return
 			t.update()
 			# clear screen
-			screen.fill((255,255,255))           
-			ticks = pygame.time.get_ticks()        
-			time = pygame.time.get_ticks()-ticks
-			hero_group.draw(screen)
-			pygame.display.flip()
+			t.screen.fill((255,255,255))           
+			hero_group.draw(t.screen)
 	except (KeyboardInterrupt, SystemExit):
 		del t
  
