@@ -29,9 +29,9 @@ class Touch2DCursor(event.EventDispatcher):
 class exTouch2DCursor(Touch2DCursor):
 	def __init__(self,blobID,args):
 		super(exTouch2DCursor,self).__init__(blobID,args)
-		self.thing = None
-	def attach(self, thing):
-		self.thing = thing
+		self.sprite = None
+	def attach(self, sprite):
+		self.sprite = sprite
 
 class Simul2DCursor(event.EventDispatcher):
 	def __init__(self, blobID,args):
@@ -46,6 +46,6 @@ class Simul2DCursor(event.EventDispatcher):
 class exSimul2DCursor(Simul2DCursor):
 	def __init__(self,blobID,args):
 		super(exSimul2DCursor,self).__init__(blobID,args)
-		self.thing = None
-	def attach(self, thing):
-		self.thing = thing
+		self.sprite = None
+	def attach(self, sprite):
+		self.sprite = sprite
