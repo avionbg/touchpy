@@ -7,32 +7,13 @@ sys.path = ['..'] + sys.path
 
 from framework import *
 
-# Subclass pygame.sprite.Sprite
-class Sprite(pygame.sprite.Sprite):
-	def __init__(self):
-		pygame.sprite.Sprite.__init__(self)
-		self._x = 0
-		self._y = 0
-	def touchup(self):
-		print 'touchup'
-	def touchdown(self):
-		print 'touchdown'
-	def touchmove(self,x,y):
-		self.rect.centerx = x
-		self.rect.centery = y
-		self.group.draw(self.screen)
-		print 'touchmove',x,y
-	def isgroup(self,group):
-		self.group = group
-	def isscreen(self,screen):
-		self.screen = screen
 def makeSprite(x,y):
-	img = pygame.Surface([20,20])
+	img = pygame.Surface([40,40])
 	img = img.convert()
 	img.fill((0xff, 0xff, 0xff))
 	img.set_colorkey((0xff, 0xff, 0xff), RLEACCEL)
-	pygame.draw.line(img, (255,0,0), (0,0), (19,19), 3)
-	pygame.draw.line(img, (255,0,0), (0,19), (19,0), 3)
+	pygame.draw.line(img, (255,0,0), (0,0), (39,39), 3)
+	pygame.draw.line(img, (255,0,0), (0,39), (39,0), 3)
 	#foo = pygame.sprite.Sprite()
 	foo = Sprite()
 	foo.image = img
@@ -68,10 +49,10 @@ def main():
 					if event.buttons[0]:
 						sprite.rect.centerx = event.pos[0]   
 						sprite.rect.centery = event.pos[1]   
-			t.update()
 			# clear screen
 			t.screen.fill((255,255,255))
 			sprites.draw(t.screen)
+			t.update()
 	except (KeyboardInterrupt, SystemExit):
 		del t
  

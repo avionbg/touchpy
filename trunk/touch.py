@@ -9,6 +9,7 @@ def intersection(set1,set2): return filter(lambda s:s in set2,set1)
 def difference(set1,set2): return filter(lambda s:s not in set2,set1)
 
 def test_import (module):
+	"""Test if module exists and return true if so"""
 	try :
 		exec('import %s' % module)
 		exec('del %s' % module)
@@ -33,6 +34,7 @@ class touchpy(event.EventDispatcher):
 			self.parser = RawParser(self.setup)
 
 	def setup(self, path, args, types, src):
+		"""Setup cursor parser to Simulator(reactivision) format, or touchlib"""
 		if args[0] == 'set':
 			if len(args[2:]) == 5:
 				self.cursorparser = Simul2DCursor
@@ -45,6 +47,7 @@ class touchpy(event.EventDispatcher):
 		self.handle2Dcur(path, args, types, src)
 
 	def handle2Dcur(self, path, args, types, src):
+		"""Do touch processing and fire events"""
 		if args[0] == 'alive':
 			touch_release = difference(self.alive,args[1:])
 			#touch_down = difference(self.alive,args[1:])
@@ -69,8 +72,9 @@ class touchpy(event.EventDispatcher):
 			self.dispatch_event('FSEQ', self.current_frame)
 
 	def update(self):
+		"""Process next packets"""
 		self.parser.update()
-
+	#Dummy events below
 	def TOUCH_DOWN(self, blobID):
 		pass
 
