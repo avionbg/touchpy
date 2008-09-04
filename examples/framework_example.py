@@ -7,6 +7,25 @@ sys.path = ['..'] + sys.path
 
 from framework import *
 
+# Subclass pygame.sprite.Sprite
+class Sprite(pygame.sprite.Sprite):
+	def __init__(self):
+		pygame.sprite.Sprite.__init__(self)
+		self._x = 0
+		self._y = 0
+	def touchup(self):
+		print 'touchup'
+	def touchdown(self):
+		print 'touchdown'
+	def touchmove(self,x,y):
+		self.rect.centerx = x
+		self.rect.centery = y
+		self.group.draw(self.screen)
+		print 'touchmove',x,y
+	def isgroup(self,group):
+		self.group = group
+	def isscreen(self,screen):
+		self.screen = screen
 def makeSprite(x,y):
 	img = pygame.Surface([20,20])
 	img = img.convert()
@@ -14,7 +33,8 @@ def makeSprite(x,y):
 	img.set_colorkey((0xff, 0xff, 0xff), RLEACCEL)
 	pygame.draw.line(img, (255,0,0), (0,0), (19,19), 3)
 	pygame.draw.line(img, (255,0,0), (0,19), (19,0), 3)
-	foo = pygame.sprite.Sprite()
+	#foo = pygame.sprite.Sprite()
+	foo = Sprite()
 	foo.image = img
 	foo.rect = img.get_rect()
 	foo.rect.centerx = x
@@ -30,8 +50,9 @@ def main():
 	sprite = makeSprite(20,20)
 	sprites = pygame.sprite.RenderPlain()
 	sprites.add(sprite)
-
-	t.register(sprites)
+	sprite.isgroup(sprites)
+	sprite.isscreen(t.screen)
+	t.register(sprite)
 
 	try:
 		while True:
@@ -43,9 +64,10 @@ def main():
 					if event.key == K_ESCAPE:
 						del t
 						return
-				elif event.type == MOUSEBUTTONDOWN:
-					sprite.rect.centerx = event.pos[0]   
-					sprite.rect.centery = event.pos[1]   
+				elif event.type == MOUSEMOTION:
+					if event.buttons[0]:
+						sprite.rect.centerx = event.pos[0]   
+						sprite.rect.centery = event.pos[1]   
 			t.update()
 			# clear screen
 			t.screen.fill((255,255,255))

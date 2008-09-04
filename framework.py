@@ -3,12 +3,12 @@ from cursors import exSimul2DCursor
 import event,sys
 import pygame
 
-def contains(obj, x, y):
+def contains(sprite, x, y):
 	'''Return boolean whether the point defined by x, y is inside the
 	rect area.
 	'''
-	if x < obj._x or x > obj._x + obj._width: return False
-	if y < obj._y or y > obj._y + obj._height: return False
+	if x < sprite.rect.x or x > sprite.rect.x + sprite.rect.width: return False
+	if y < sprite.rect.i or y > sprite.rect.y + sprite.rect.height: return False
 	return True
 
 class touchframework (touchpy):
@@ -49,8 +49,9 @@ class touchframework (touchpy):
 
 	def test_under (self,blobId,sprites):
 		for sprite in sprites:
-			if contains(sprite,x, y):
-				blobId.attach(thing)
+			#if contains(sprite,int(self.blobs[blobId].xpos*width), int(self.blobs[blobId].xpos*width)):
+			if sprite.rect.collidepoint(int(blobId.xpos*self.width), int(blobId.ypos*self.height)):
+				blobId.attach(sprite)
 				self.sprites[sprite].touchdown()
 
 	def handle2Dcur(self, path, args, types, src):
@@ -59,19 +60,18 @@ class touchframework (touchpy):
 			self.alive = args[1:]
 			for blobID in touch_release:
 				self.dispatch_event('TOUCH_UP', blobID, self.blobs[blobID].xpos, self.blobs[blobID].ypos)
-				print 'Touchup'
-				if self.blobs[blobID].thing: self.blobs[blobID].thing.touchup()
+				if self.blobs[blobID].sprite: self.blobs[blobID].sprite.touchup()
 				del self.blobs[blobID]
 		elif args[0] == 'set':
 			blobID = args[1]
 			if blobID not in self.blobs:
 				self.blobs[blobID] = self.cursorparser(blobID,args[2:])
 				self.dispatch_event('TOUCH_DOWN', blobID)
-				self.test_under(self.blobs[blobID],self.things)
+				self.test_under(self.blobs[blobID],self.sprites)
 			else:
 				self.blobs[blobID].move(args[2:])
 				self.dispatch_event('TOUCH_MOVE', blobID)
-				if self.blobs[blobID].thing: self.blobs[blobID].thing.touchmove()
+				if self.blobs[blobID].sprite: self.blobs[blobID].sprite.touchmove(self.blobs[blobID].xpos*self.width,self.blobs[blobID].ypos*self.height)
 		elif args[0] == 'fseq':
 			self.last_frame = self.current_frame
 			self.current_frame = args[1]
