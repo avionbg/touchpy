@@ -18,12 +18,21 @@ def test_import (module):
 	else :
 		return True
 
+'''Basic event for a basic event queue. This probably isn't the best
+way to implement it, but its simple and it works'''
+class Event:
+	def __init__(self, type, blob):
+		self.type = type
+		self.blob = blob
+		self.pos = [blob.xpos, blob.ypos]
+
 class touchpy(event.EventDispatcher):
 	def __init__(self, host='127.0.0.1', port=3333):
 		self.current_frame = self.last_frame = 0
 		self.cursorparser = Generic2DCursor
 		self.alive = []
 		self.blobs = {}
+		self.events = []
 
 		if test_import('liblo'):
 			from llo import LibloParser
@@ -55,6 +64,7 @@ class touchpy(event.EventDispatcher):
 			self.alive = args[1:]
 			for blobID in touch_release:
 				self.dispatch_event('TOUCH_UP', blobID, self.blobs[blobID].xpos, self.blobs[blobID].ypos)
+				self.events.append(Event('TOUCH_UP', self.blobs[blobID]))
 				del self.blobs[blobID]
 
 		elif args[0] == 'set':
@@ -62,9 +72,12 @@ class touchpy(event.EventDispatcher):
 			if blobID not in self.blobs:
 				self.blobs[blobID] = self.cursorparser(blobID,args[2:])
 				self.dispatch_event('TOUCH_DOWN', blobID)
+				self.events.append(Event('TOUCH_DOWN', self.blobs[blobID]))
 			else:
 				self.blobs[blobID].move(args[2:])
 				self.dispatch_event('TOUCH_MOVE', blobID)
+				self.events.append(Event('TOUCH_MOVE', self.blobs[blobID]))
+
 
 		elif args[0] == 'fseq':
 			self.last_frame = self.current_frame
@@ -72,8 +85,11 @@ class touchpy(event.EventDispatcher):
 			self.dispatch_event('FSEQ', self.current_frame)
 
 	def update(self):
+		#Clear the event queue
+		self.events = []
 		"""Process next packets"""
 		self.parser.update()
+
 	#Dummy events below
 	def TOUCH_DOWN(self, blobID):
 		pass

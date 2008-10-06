@@ -28,6 +28,12 @@ class Touch2DCursor(event.EventDispatcher):
 		"""Cursor already exist on this point, so we are just updating old x,y"""
 		self.oxpos, self.oypos = self.xpos, self.ypos
 		self.xpos, self.ypos, self.xmot, self.ymot, self.mot_accel, self.Width , self.Height = args[0:7]
+		self.motcalc()
+
+	#Calculates the relative movement, incase tracker is not providing it(in the case of touchlib)
+	def motcalc(self):
+		self.xmot = self.xpos - self.oxpos
+		self.ymot = self.ypos - self.oypos
 
 class exTouch2DCursor(Touch2DCursor):
 	"""Subclass of touchlib cursor for framework use,
