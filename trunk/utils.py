@@ -13,11 +13,13 @@ def _get_sz_linux2():
     sz = [int(x) for x in sz]
     return sz
 
-#TODO: Test
 def _get_sz_darwin():
-    sz = os.popen('osascript -e \'tell application \"Finder\" to get bounds of window of desktop')
-    sz.split(', ')
-    return (sz[2], sz[3])
+	sz = os.popen("osascript -e 'tell application \"Finder\" to get bounds of window of desktop'").read()
+	sz = sz.split(', ')
+	sz[3] = sz[3][:-1]
+	sz[2] = int(sz[2])
+	sz[3] = int(sz[3])
+	return (sz[2], sz[3])
  
 #TODO: Test   
 def _get_sz_nt():
@@ -27,7 +29,7 @@ def _get_sz_nt():
 def get_sz():
     if sys.platform == 'linux2':
         return _get_sz_linux2()
-    elif sys.playform == 'darwin':
+    elif sys.platform == 'darwin':
         return _get_sz_darwin()
     elif sys.platform == 'win32':
         return _get_sz_nt()
