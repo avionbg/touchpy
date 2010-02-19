@@ -63,7 +63,7 @@ typedef enum
 
 typedef struct
 {
-    double angle, ancienAngle, displayAngle, oldAngle;
+    double angle, ancienAngle, displayAngle, oldAngle, lastChange;
     double length, oldLength, sentZoom, displayZoom, oldZoom;
     int bZoom, id;
 } gesturewindow;
@@ -72,6 +72,7 @@ typedef struct
 {
     int id,w;
     float x, y, xmot,ymot, mot_accel,width,height,oldx,oldy;
+    Bool first;
 } mtblob;
 
 typedef struct
@@ -669,7 +670,6 @@ click_handler (void *data)
     return FALSE;
 }
 
-//TODO:  Need a way of storing details for each window
 static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
 {
     MULTITOUCH_DISPLAY (d);
@@ -720,12 +720,11 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
 
                 CompWindow *  w = (void *) blobs[BlobID].w;
 
-
                 Bool set = FALSE;
 
                 int m = -1;
                 gesturewindow *winCol = md->wins;
-		int j;
+                int j;
                 for (j=0;j<MAXWINS;j++)
                 {
                     if (winCol[j].id == (int)w->id)
@@ -737,26 +736,25 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
 
                 if (m == -1)
                 {
-		        for (j=0;j<MAXWINS;j++)
-		        {
-		            if (winCol[j].id == -1)
-		            {
-		                m = j;
+                    for (j=0;j<MAXWINS;j++)
+                    {
+                        if (winCol[j].id == -1)
+                        {
+                            m = j;
 
-		                set = TRUE;
-		            }
-		        }
+                            set = TRUE;
+                        }
+                    }
 
                 }
 
-                if (set)
-		{
-                    double dx = (blobs[BlobID].x - blobs[multiblobs].x);// * s->width;
-                    double dy = (blobs[multiblobs].y - blobs[BlobID].y);// * s->height;
+                if (set && !blobs[BlobID].first && !blobs[multiblobs].first)
+                {
+                    double dx = (blobs[BlobID].x - blobs[multiblobs].x);
+                    double dy = (blobs[multiblobs].y - blobs[BlobID].y);
 
 
                     winCol[m].angle= atan2(dy,dx)*180/3.14159;
-                    char cmd[300];
                     int val=0;
 
                     if (winCol[m].bZoom) {
@@ -769,29 +767,78 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
                     if (abs(winCol[m].angle-winCol[m].ancienAngle)>2) {
                       winCol[m].ancienAngle=winCol[m].angle;
 
-                      winCol[m].displayAngle = winCol[m].displayAngle + (winCol[m].angle - winCol[m].oldAngle);
+		      double change = (winCol[m].angle - winCol[m].oldAngle);
+
+		      if (change > 180)
+		      {
+			change = 180 - ((int)change % (int)180);
+			if (winCol[m].lastChange < 0)
+			{
+			   change = -change;
+			}
+  		      }
+		      if (change < -180)
+		      {
+			change = 180 - ((int)(-change) % (int)180);
+			if (winCol[m].lastChange < 0)
+			{
+			   change = -change;
+			}
+  		      }
+
+		      winCol[m].lastChange = change;
+
+                      winCol[m].displayAngle = winCol[m].displayAngle + change;
 
                       winCol[m].oldAngle = winCol[m].angle;
 
                       val=winCol[m].displayAngle;
 
-                      sprintf(cmd, "dbus-send --print-reply --type=method_call --dest=org.freedesktop.compiz /org/freedesktop/compiz/freewins/allscreens/rotate org.freedesktop.compiz.activate string:'z' double:%d  string:'window' int32:%i", -(int)val, (int)w->id);
+                      CompOption arg[4];
+                      int nArg = 0;
 
-                      system(cmd);
-                      printf(" %d \n", (int)val);
+		      arg[nArg].name = "window";
+		      arg[nArg].type = CompOptionTypeInt;
+		      arg[nArg].value.i = w->id;
+		      nArg++;
+
+                      arg[nArg].name = "root";
+                      arg[nArg].type = CompOptionTypeInt;
+                      arg[nArg].value.i = s->root;
+                      nArg++;
+
+		      float newVal = (float)-val;
+
+                      arg[nArg].name = "z";
+                      arg[nArg].type = CompOptionTypeFloat;
+                      arg[nArg].value.f = newVal;
+                      nArg++;
+
+		      int newID = (int)w->id;
+
+                      arg[nArg].name = "window";
+                      arg[nArg].type = CompOptionTypeInt;
+                      arg[nArg].value.i = newID;
+
+                      sendInfoToPlugin (d, arg, nArg, "freewins", "rotate");
+
                     }
 
                     if ( ((winCol[m].length/winCol[m].oldLength) > 1.1) || ((winCol[m].length/winCol[m].oldLength) < 0.9)  ) {
                       winCol[m].sentZoom*=(winCol[m].length/winCol[m].oldLength);
                       winCol[m].bZoom=1;
                       printf("%lf\n", winCol[m].sentZoom);
-                      if (winCol[m].sentZoom > 2)
+                      if (winCol[m].displayZoom > 2)
                       {
                         winCol[m].sentZoom = 2;
+			winCol[m].oldZoom = 2;
+			winCol[m].displayZoom = 2;
                       }
-                      else if (winCol[m].sentZoom < 0.5)
+                      else if (winCol[m].displayZoom < 0.5)
                       {
                         winCol[m].sentZoom = 0.5;
+			winCol[m].oldZoom = 0.5;
+			winCol[m].displayZoom = 0.5;
                       }
                       else
                       {
@@ -800,14 +847,63 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
 
                           winCol[m].oldZoom = winCol[m].sentZoom;
 
-                          sprintf(cmd, "dbus-send --print-reply --type=method_call --dest=org.freedesktop.compiz /org/freedesktop/compiz/freewins/allscreens/scale org.freedesktop.compiz.activate string:'x' double:%lf string:'y' double:%lf string:'window' int32:%i", winCol[m].displayZoom, winCol[m].displayZoom, (int)w->id);
+                          CompOption arg[5];
+                          int nArg = 0;
 
-                          system(cmd);
-                          printf("%s \n",cmd);
+		          arg[nArg].name = "window";
+		          arg[nArg].type = CompOptionTypeInt;
+		          arg[nArg].value.i = w->id;
+		          nArg++;
+
+                          arg[nArg].name = "root";
+                          arg[nArg].type = CompOptionTypeInt;
+                          arg[nArg].value.i = s->root;
+                          nArg++;
+
+                          arg[nArg].name = "x";
+                          arg[nArg].type = CompOptionTypeFloat;
+                          arg[nArg].value.f = winCol[m].displayZoom;
+                          nArg++;
+
+                          arg[nArg].name = "y";
+                          arg[nArg].type = CompOptionTypeFloat;
+                          arg[nArg].value.f = winCol[m].displayZoom;
+                          nArg++;
+
+                          arg[nArg].name = "window";
+                          arg[nArg].type = CompOptionTypeInt;
+                          arg[nArg].value.i = (int)w->id;
+
+                          sendInfoToPlugin (d, arg, nArg, "freewins", "scale");
 
                       }
                     }
                 }
+		else if (blobs[BlobID].first || blobs[multiblobs].first)
+		{
+                    double dx = (blobs[BlobID].x - blobs[multiblobs].x);
+                    double dy = (blobs[multiblobs].y - blobs[BlobID].y);
+
+                    winCol[m].angle= atan2(dy,dx)*180/3.14159;
+		    winCol[m].oldAngle = winCol[m].angle;
+
+		    winCol[m].sentZoom*=(winCol[m].length/winCol[m].oldLength);
+                    if (winCol[m].displayZoom > 2)
+                    {
+                        winCol[m].sentZoom = 2;
+			winCol[m].oldZoom = 2;
+			winCol[m].displayZoom = 2;
+                    }
+                    else if (winCol[m].displayZoom < 0.5)
+                    {
+                        winCol[m].sentZoom = 0.5;
+			winCol[m].oldZoom = 0.5;
+			winCol[m].displayZoom = 0.5;
+                    }
+		    winCol[m].oldZoom = winCol[m].sentZoom;
+		    blobs[BlobID].first = FALSE;
+		    blobs[multiblobs].first = FALSE;
+		}
 
 //            resizeWindow(w, dx, dy, w->attrib.width, w->attrib.height, w->attrib.border_width);
             }
@@ -827,6 +923,7 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
         }
         break;
     case EventDown:
+	blobs[BlobID].first = TRUE;
         if (md->Wm)
             wid = findWindowAtPoint ((int) s->width * blobs[BlobID].x,(int) s->height * blobs[BlobID].y);
         if (md->Debug)
@@ -1073,6 +1170,7 @@ multitouchToggleMultitouch (CompDisplay *d,
             md->blob[j].id = 0;
             md->blob[j].w = 0;
             md->blob[j].oldx = 0;
+	    md->blob[j].first = FALSE;
             md->click[j].id = -1;
         }
         for (j=0;j<MAXWINS;j++)
@@ -1087,6 +1185,7 @@ multitouchToggleMultitouch (CompDisplay *d,
             md->wins[j].displayZoom = 1;
             md->wins[j].oldZoom = 1;
             md->wins[j].bZoom = 1;
+	    md->wins[j].lastChange = 1;
             md->wins[j].id = -1;
         }
         md->st = lo_server_thread_new(md->port, loerror);
