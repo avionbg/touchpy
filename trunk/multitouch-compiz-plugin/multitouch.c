@@ -693,8 +693,8 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
             dv->x1 = blobs[BlobID].oldx;
             dv->y1 = blobs[BlobID].oldy;
             if (ms->CurrentEffect == Annotate)
-                md->timeoutHandles = compAddTimeout (0,(int)makeannotate, NULL, dv);
-            else md->timeoutHandles = compAddTimeout (0,(int)makeripple, NULL, dv);
+                md->timeoutHandles = compAddTimeout (0, NULL, (int)makeannotate, dv);
+            else md->timeoutHandles = compAddTimeout (0, NULL, (int)makeripple, dv);
         }
         oldestblob = blobs[BlobID].id;
         for ( k=0;k<MAXBLOBS; k++)
@@ -918,7 +918,7 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
                 mv->w = w;
                 mv->dx = dx;
                 mv->dy = dy;
-                md->moveWindowHandle = compAddTimeout (0, (int)moveWindow_handler, NULL, mv);
+                md->moveWindowHandle = compAddTimeout (0, NULL, (int)moveWindow_handler, mv);
             }
         }
         break;
@@ -956,7 +956,7 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
         md->click[k].id = blobs[BlobID].id;
         md->click[k].x = blobs[BlobID].x;
         md->click[k].y = blobs[BlobID].y;
-        md->clickTimeoutHandle = compAddTimeout (md->Interval, (int)click_handler, NULL, cv);
+        md->clickTimeoutHandle = compAddTimeout (md->Interval, NULL, (int)click_handler, cv);
 
         blobs[BlobID].id = 0;
         blobs[BlobID].x = 0;
