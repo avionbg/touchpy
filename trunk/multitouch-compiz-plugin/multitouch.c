@@ -58,7 +58,8 @@ typedef enum
 {
     Disabled = 0,
     Annotate = 1,
-    Ripple = 2
+    Ripple = 2,
+    PaintFire = 3
 }mtEffect;
 
 typedef struct
@@ -437,7 +438,7 @@ multitouchToggleEffects (CompDisplay *d,
     {
         MULTITOUCH_DISPLAY(d);
         MULTITOUCH_SCREEN (s);
-        if (ms->CurrentEffect == Ripple)
+        if (ms->CurrentEffect == PaintFire)
             ms->CurrentEffect = Disabled;
         else
         {
@@ -567,6 +568,44 @@ makeannotate (void *data)
 }
 
 
+static Bool
+makefire (void *data)
+{
+    DisplayValue *dv = (DisplayValue *) data;
+    CompScreen *s;
+    s = findScreenAtDisplay (dv->display, currentRoot);
+    int width = s->width;
+    int height = s->height;
+    MULTITOUCH_DISPLAY (dv->display);
+
+    if (s)
+    {
+        CompOption arg[3];
+        int nArg = 0;
+
+        arg[nArg].name = "root";
+        arg[nArg].type = CompOptionTypeInt;
+        arg[nArg].value.i = s->root;
+        nArg++;
+
+        arg[nArg].name = "x";
+        arg[nArg].type = CompOptionTypeFloat;
+        arg[nArg].value.f = (float) (dv->x0 * width);
+        nArg++;
+
+        arg[nArg].name = "y";
+        arg[nArg].type = CompOptionTypeFloat;
+        arg[nArg].value.f = (float) (dv->y0 * height);
+        nArg++;
+
+        sendInfoToPlugin (dv->display, arg, nArg, "firepaint", "add_particle");
+    }
+    free (dv);
+    return FALSE;
+}
+
+
+
 //static Bool
 //displaytext (void *data)
 //{
@@ -694,6 +733,8 @@ static void gesture_handler(mtEvent event, CompDisplay * d,int BlobID)
             dv->y1 = blobs[BlobID].oldy;
             if (ms->CurrentEffect == Annotate)
                 md->timeoutHandles = compAddTimeout (0, NULL, (int)makeannotate, dv);
+            else if (ms->CurrentEffect == PaintFire)
+                md->timeoutHandles = compAddTimeout (0, NULL, (int)makefire, dv);
             else md->timeoutHandles = compAddTimeout (0, NULL, (int)makeripple, dv);
         }
         oldestblob = blobs[BlobID].id;
@@ -1023,6 +1064,8 @@ static int command_handler(const char *path, const char *types, lo_arg **argv, i
             ms->CurrentEffect = Annotate;
         else if (ms->CurrentEffect == Annotate)
             ms->CurrentEffect = Ripple;
+        else if (ms->CurrentEffect == Ripple)
+            ms->CurrentEffect = PaintFire;
     }
     else
     {
