@@ -44,7 +44,7 @@
 			</option>
 			<option name="toggle_effects" type="key">
 				<short>Switch effects</short>
-				<long>Switch from annotate to water wave or disable effects.</long>
+				<long>Switch between ripple, annotate, fire, or disable effects.</long>
 				<default>&lt;Super&gt;F12</default>
 			</option>
 		</group>
