@@ -3,6 +3,7 @@
  * multitouch.c
  *
  * Author : Goran Medakovic
+ * Contributors: James McNaughton, Robert Schulz
  * Email : avion.bg@gmail.com
  *
  * Copyright (c) 2008 Goran Medakovic <avion.bg@gmail.com>
