@@ -1,0 +1,2 @@
+Python framework to build media rich applications on top of tuio framework. This gives as possibility to use multitouch screens for input, and It doesn't depends on one implementation only.
+One part of the project is also a compiz plugin, which will be used as a debuging output, and a overlay for drawing fast pointers, displaying radial menu etc.
